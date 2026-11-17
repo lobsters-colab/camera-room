@@ -447,7 +447,7 @@ async function makeGoal(){
   if(S.sample){
     S.goalBusy=true;render(true);
     try{const r=await S.sample(goalPrompt(text,base),{kind:'plan'});g=mergeAI(base,parseJSON(r.text||''))}
-    catch(e){g={...base,note:'AI 暫時無法使用，先用內建規則產生計畫。'};if(e&&e.code==='not_granted')S.sample=null}
+    catch(e){g={...base,note:'AI 暫時無法使用，先用內建規則產生計畫。'+(e&&e.message?'（'+String(e.message).slice(0,100)+'）':'')};if(e&&e.code==='not_granted')S.sample=null}
     S.goalBusy=false;
   }
   S.goal=g;S.goalEdit=false;put('goal',g);toast('目標計畫已產生 🎯');S.tab='plan';LS.set('ft-tab','plan');render(true);window.scrollTo(0,0);
@@ -814,7 +814,8 @@ async function askAI(q){
     else if(e&&e.code==='rate_limited')S.ai.err='今天的 AI 使用次數已經用完，明天再來問吧。';
     else if(e&&e.code==='bad_key')S.ai.err='Gemini 金鑰無效或沒有權限，請到「我的」重新貼上。'+(e.message?'（'+e.message.slice(0,80)+'）':'');
     else if(e&&e.code==='quota')S.ai.err='免費 AI 額度暫時用完了，過一陣子（或明天）再試。';
-    else if(!(aiCtl&&aiCtl.signal.aborted))S.ai.err='教練暫時無法回答，請稍後再試。';
+    else if(e&&e.code==='network')S.ai.err='連不上 Gemini，請確認網路後再試。';
+    else if(!(aiCtl&&aiCtl.signal.aborted))S.ai.err='教練暫時無法回答，請稍後再試。'+(e&&e.message?'（'+String(e.message).slice(0,120)+'）':'');
   }
   S.ai.busy=false;if(S.tab==='coach')render(true);
 }

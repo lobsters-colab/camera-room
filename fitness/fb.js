@@ -46,31 +46,58 @@ export async function initFirebase() {
 
 // 個人用：使用者自己的 Gemini API 金鑰（只存在這支手機）
 const GKEY = 'ft-gemini-key', GMOD = 'ft-gemini-model';
-const GMODELS = ['gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+const GMODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 export const geminiKey = () => { try { return localStorage.getItem(GKEY) || ''; } catch (e) { return ''; } };
-export function setGeminiKey(k) { try { k ? localStorage.setItem(GKEY, k.trim()) : localStorage.removeItem(GKEY); } catch (e) {} }
-async function geminiCall(prompt) {
-  const key = geminiKey(); let pref = ''; try { pref = localStorage.getItem(GMOD) || ''; } catch (e) {}
-  const list = pref ? [pref, ...GMODELS.filter(m => m !== pref)] : GMODELS;
-  for (const m of list) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
-    });
-    if (r.status === 404) continue;                       // 模型名稱不存在 → 試下一個
-    if (r.status === 429) throw { code: 'quota' };
+export function setGeminiKey(k) { try { k ? localStorage.setItem(GKEY, k.trim()) : (localStorage.removeItem(GKEY), localStorage.removeItem(GMOD)); } catch (e) {} }
+const GBASE = 'https://generativelanguage.googleapis.com/v1beta/';
+let listed = null;
+// 向 Google 查詢這把金鑰可以用的模型，挑適合聊天的 flash 系列
+async function availableModels(key) {
+  if (listed) return listed;
+  try {
+    const r = await fetch(GBASE + 'models?pageSize=200', { headers: { 'x-goog-api-key': key } });
     if (r.status === 400 || r.status === 401 || r.status === 403) {
       const j = await r.json().catch(() => ({}));
-      const msg = (j.error && j.error.message) || '';
-      if (/model/i.test(msg) && /not (found|supported)/i.test(msg)) continue;
-      throw { code: 'bad_key', message: msg };
+      throw { code: 'bad_key', message: (j.error && j.error.message) || ('HTTP ' + r.status) };
     }
-    if (!r.ok) throw { code: 'unavailable' };
+    if (!r.ok) return GMODELS;
     const j = await r.json();
+    const ok = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.replace(/^models\//, ''))
+      .filter(n => /^gemini/.test(n) && !/(image|tts|audio|live|embed|vision|robotics|computer|native)/i.test(n));
+    const ver = n => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
+    const score = n => (/latest/.test(n) ? 3 : 0) + (/flash/.test(n) ? 2 : 0) + (/lite/.test(n) ? 0.5 : 0) - (/(preview|exp)/.test(n) ? 1.5 : 0) + ver(n) / 10;
+    ok.sort((x, y) => score(y) - score(x));
+    listed = ok.length ? ok.slice(0, 6) : GMODELS;
+  } catch (e) { if (e && e.code === 'bad_key') throw e; listed = GMODELS; }
+  return listed;
+}
+async function geminiCall(prompt) {
+  const key = geminiKey(); let pref = ''; try { pref = localStorage.getItem(GMOD) || ''; } catch (e) {}
+  const models = await availableModels(key);
+  const list = [...new Set([pref, ...models].filter(Boolean))];
+  let lastErr = '';
+  for (const m of list) {
+    let r;
+    try {
+      r = await fetch(`${GBASE}models/${m}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
+      });
+    } catch (e) { throw { code: 'network', message: String(e && e.message || e) }; }
+    const j = await r.json().catch(() => ({}));
+    const msg = (j.error && j.error.message) || '';
+    if (r.status === 404 || (/model/i.test(msg) && /(not found|not supported|deprecated|no longer)/i.test(msg))) { lastErr = m + '：' + (msg || '404'); if (m === pref) try { localStorage.removeItem(GMOD); } catch (e) {} continue; }
+    if (r.status === 429) throw { code: 'quota', message: msg };
+    if (r.status === 400 || r.status === 401 || r.status === 403) throw { code: 'bad_key', message: msg };
+    if (!r.ok) { lastErr = m + '：HTTP ' + r.status + ' ' + msg; continue; }
     try { localStorage.setItem(GMOD, m); } catch (e) {}
-    return ((j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || []).map(p => p.text || '').join('');
+    const c = j.candidates && j.candidates[0];
+    const text = ((c && c.content && c.content.parts) || []).map(p => p.text || '').join('');
+    if (!text) throw { code: 'unavailable', message: 'AI 沒有回覆內容' + (c && c.finishReason ? '（' + c.finishReason + '）' : '') };
+    return text;
   }
-  throw { code: 'unavailable' };
+  throw { code: 'unavailable', message: lastErr || '找不到可用的模型' };
 }
 export const aiReady = () => !!model || !!geminiKey();
 
@@ -125,6 +152,7 @@ export async function aiCall(prompt, opts = {}) {
     if (opts.onText) opts.onText({ text, delta: text });
     return { text };
   } catch (e) {
+    if (e && ['quota', 'bad_key', 'network', 'unavailable'].includes(e.code) && !model) throw e;
     if (e && (e.code === 'quota' || e.code === 'bad_key')) throw e;
     const m = String(e && (e.message || e.code) || '');
     if (/429|RESOURCE_EXHAUSTED|quota/i.test(m)) throw { code: 'quota' };
