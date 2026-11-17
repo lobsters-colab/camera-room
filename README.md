@@ -6,3 +6,7 @@
 - AI 消除路人（MI-GAN）、AI 去背貼紙（U²-Net）、人物偵測（YOLOv8n-seg，AGPL-3.0）
 - 拼貼：格狀、隨手疊、底片條、一週／月曆回顧
 - 回顧影片：跟著音樂節拍切換，輸出 MP4
+
+## 健身追蹤
+
+手機健身紀錄 App：https://lobsters-colab.github.io/camera-room/fitness/
