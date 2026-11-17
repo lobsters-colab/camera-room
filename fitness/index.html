@@ -138,9 +138,53 @@ nav.tabs button.on{color:var(--acc);font-weight:700}
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--mute);margin-top:10px}
 .legend span{display:flex;align-items:center;gap:4px}.legend i{width:8px;height:8px;border-radius:50%;display:block}
 .spacer{height:8px}
+/* ---- 開啟動畫 ---- */
+#splash{position:fixed;inset:0;z-index:100;background:var(--acc);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px calc(40px + env(safe-area-inset-bottom));text-align:center;transition:opacity .45s ease,transform .45s ease;cursor:pointer;-webkit-user-select:none;user-select:none}
+#splash.out{opacity:0;transform:scale(1.04);pointer-events:none}
+#splash .db{width:96px;height:96px;animation:lift 1.1s cubic-bezier(.3,1.4,.5,1) both}
+#splash .db rect{fill:#fff}
+#splash .q{font-size:23px;font-weight:900;line-height:1.5;margin-top:34px;max-width:340px;letter-spacing:.5px;opacity:0;animation:qin .7s .45s ease-out forwards;text-wrap:balance}
+#splash .q::before{content:'「';opacity:.6}#splash .q::after{content:'」';opacity:.6}
+#splash .bar{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:120px;height:4px;border-radius:4px;background:rgba(255,255,255,.3);overflow:hidden}
+#splash .bar i{display:block;height:100%;width:100%;background:#fff;transform-origin:left;animation:fill var(--d,2.4s) linear forwards}
+#splash .skip{position:absolute;bottom:calc(40px + env(safe-area-inset-bottom));font-size:12px;opacity:.7}
+@keyframes lift{0%{transform:translateY(40px) scale(.6);opacity:0}45%{transform:translateY(-18px) scale(1.06);opacity:1}65%{transform:translateY(4px) scale(.98)}100%{transform:none}}
+@keyframes qin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){#splash .db,#splash .q,#splash .bar i{animation:none;opacity:1}}
 </style>
 </head>
 <body>
+<div id="splash" role="dialog" aria-label="開啟畫面">
+  <svg class="db" viewBox="0 0 100 100" aria-hidden="true"><rect x="12" y="30" width="9" height="40" rx="3"/><rect x="23" y="22" width="11" height="56" rx="3"/><rect x="34" y="45" width="32" height="10" rx="5"/><rect x="66" y="22" width="11" height="56" rx="3"/><rect x="79" y="30" width="9" height="40" rx="3"/></svg>
+  <div class="q" id="splashQ"></div>
+  <div class="skip">點一下跳過</div>
+  <div class="bar"><i></i></div>
+</div>
+<script>
+(function(){
+  var Q=['成功的男人，是不需要被定義的。','今天的痠痛，是明天的線條。','鐵不會說謊，100 公斤永遠是 100 公斤。','不用很厲害才開始，但要開始才會很厲害。','最難的一組，是走進健身房的那一步。','肌肉不會背叛你，只是會讓你等。','汗水，是脂肪在哭。','你唯一的對手，是沙發。','再一下。對，就是那一下。','不是重量太重，是你還沒變強。','身材，是最誠實的履歷。','強者不是不累，是累了還在。','你練的不是肌肉，是說到做到。','把手機放下，把啞鈴拿起來。','未來的你，會謝謝現在的你。','不用完美，只要出現。','休息是為了練更重，不是為了不練。','真正的強者，從不跳過腿日。','成功的路上不擁擠，因為大家還在床上。','汗流得越多，藉口就越少。','一個月後，你會慶幸今天有開始。','自信，是一組一組練出來的。','沒有捷徑，但有計畫。','比昨天多一下，就是贏。','不爽的時候，就去推鐵。','別問效果在哪，先問自己練了沒。','把「明天開始」，換成「現在開始」。','慢慢來，比較快。','自律的人，最自由。','今天不想練？那就先練一組就好。','先做到，再做好。','衣服變緊不是胖，是你長大了。','你的極限，比你以為的還遠一點。','重量會進步，人也會。','練完的那一刻，什麼煩惱都輕了。','累，代表你正在變強。','不跟別人比，只跟昨天的自己比。','狀態不好也要練，因為狀態是練出來的。','沒有白流的汗，只有還沒到的成果。','今天的你，值得一場好訓練。'];
+  var el=document.getElementById('splash'),q=document.getElementById('splashQ'),done=false,t;
+  function pick(){var last=-1;try{last=+localStorage.getItem('ft-lastq')}catch(e){}var i;do{i=Math.floor(Math.random()*Q.length)}while(i===last&&Q.length>1);try{localStorage.setItem('ft-lastq',i)}catch(e){}return Q[i]}
+  function hide(){if(done)return;done=true;clearTimeout(t);el.classList.add('out');setTimeout(function(){el.style.display='none'},460)}
+  function show(){
+    var s=pick();q.innerHTML='';var parts=[],cur='';for(var k=0;k<s.length;k++){cur+=s[k];if('，？'.indexOf(s[k])>=0&&k<s.length-1){parts.push(cur);cur=''}}if(cur)parts.push(cur);parts.forEach(function(p,i){q.appendChild(document.createTextNode(p));if(i<parts.length-1&&s.length>11)q.appendChild(document.createElement('br'))});done=false;
+    var d=Math.min(3600,Math.max(2200,1300+s.length*70));
+    el.style.setProperty('--d',d+'ms');el.style.display='flex';
+    // 重新觸發動畫
+    [].forEach.call(el.querySelectorAll('.db,.q,.bar i'),function(n){n.style.animation='none';void n.offsetWidth;n.style.animation=''});
+    el.classList.remove('out');t=setTimeout(hide,d);
+  }
+  el.addEventListener('click',hide);
+  try{show()}catch(e){el.style.display='none'}
+  // 從背景回來超過 10 分鐘，也當作「重新打開」
+  var hiddenAt=0;
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='hidden')hiddenAt=Date.now();
+    else if(hiddenAt&&Date.now()-hiddenAt>10*60*1000){var a=document.querySelector('#elapsed');if(!a)show()}
+  });
+})();
+</script>
 <div class="wrap">
   <header class="top">
     <div><div class="sub" id="dateline"></div><h1>健身追蹤</h1></div>
