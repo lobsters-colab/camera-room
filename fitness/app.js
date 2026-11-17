@@ -875,7 +875,7 @@ const ACT={
       if(bw.length){const m={};[...S.bw,...bw].forEach(x=>m[x.d]=x);S.bw=Object.values(m).sort((a,b)=>a.d<b.d?-1:1).slice(-400);await put('bodyweight',{entries:S.bw})}
       const have=new Set(S.workouts.map(w=>w.id));let n=0;
       for(const w of ws){if(have.has(w.id))continue;await put(w.id,w);n++}
-      S.workouts=sortW([...S.workouts,...ws.filter(w=>!have.has(w.id))]);
+      S.workouts=sortW([...S.workouts,...ws.filter(w=>!have.has(w.id))]);persistLocal();
       S.importOpen=false;toast(`已匯入 ${n} 筆訓練`+(bw.length?`、${bw.length} 筆體重`:''));
     }catch(e){toast('匯入失敗，請再試一次')}
     S.importBusy=false;render(true)},

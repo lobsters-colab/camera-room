@@ -1,5 +1,5 @@
 // 離線快取：App 外殼可離線開啟；資料由 Firestore 自己的離線快取處理
-const VERSION = 'ft-v5';
+const VERSION = 'ft-v6';
 const SHELL = ['./', './index.html', './app.js', './fb.js', './config.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
