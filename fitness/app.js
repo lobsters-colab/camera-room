@@ -311,17 +311,20 @@ const CN={零:0,一:1,二:2,兩:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9};
 function cnNum(s){if(!s)return NaN;if(/^\d+(\.\d+)?$/.test(s))return +s;if(s==='半')return 0.5;const m=s.match(/^([一二兩三四五六七八九])?(十)?([一二三四五六七八九])?$/);if(!m||(!m[1]&&!m[2]&&!m[3]))return NaN;if(!m[2])return CN[m[1]||m[3]];return (m[1]?CN[m[1]]:1)*10+(m[3]?CN[m[3]]:0)}
 const NUMRE='(\\d+(?:\\.\\d+)?|[一二兩三四五六七八九十半]+)';
 function parseGoal(text){
-  const t=text.replace(/\s/g,'');let kg=null,abs=null,m;
-  if((m=t.match(new RegExp('(?:到|至)'+NUMRE+'(公斤|kg|KG|Kg|斤)')))){abs=cnNum(m[1])*(m[2]==='斤'?0.6:1)}
-  if((m=t.match(new RegExp(NUMRE+'(公斤|kg|KG|Kg|斤)')))){kg=cnNum(m[1])*(m[2]==='斤'?0.6:1)}
+  const t=text.replace(/\s+/g,' ').trim();let kg=null,abs=null,m;
+  const UNIT='\\s*(公斤|kg|KG|Kg|斤|lbs|lb|LBS|LB|Lbs|磅)';
+  const toK=(n,u)=>cnNum(n)*(u==='斤'?0.6:/lb|磅/i.test(u)?0.45359237:1);
+  if((m=t.match(new RegExp('(?:到|至)\\s*'+NUMRE+UNIT))))abs=toK(m[1],m[2]);
+  if((m=t.match(new RegExp(NUMRE+UNIT))))kg=toK(m[1],m[2]);
   let weeks=null;
   if(/半年/.test(t))weeks=26;
-  else if((m=t.match(new RegExp(NUMRE+'(個?月|週|周|星期|禮拜|天|年)')))){const n=cnNum(m[1]),u=m[2];weeks=/月/.test(u)?n*4.345:/年/.test(u)?n*52:/天/.test(u)?n/7:n}
-  const lift=t.match(/(臥推|深蹲|硬舉|肩推|引體)/);
+  else if((m=t.match(new RegExp(NUMRE+'\\s*(個?月|週|周|星期|禮拜|天|年)')))){const n=cnNum(m[1]),u=m[2];weeks=/月/.test(u)?n*4.345:/年/.test(u)?n*52:/天/.test(u)?n/7:n}
+  const lm=t.match(/(啞鈴|槓鈴)?(臥推|深蹲|硬舉|肩推|引體)/);const lift=lm?[lm[0],lm[0]]:null;
+  let liftKg=null;if(lm){const after=t.slice(lm.index);const mm=after.match(new RegExp(NUMRE+UNIT));if(mm)liftKg=r1(toK(mm[1],mm[2]))}
   let type='general';
   if(/增重|增肌|變壯|長肉|變胖|胖|bulk/i.test(t))type='gain';
   else if(/減重|減肥|減脂|瘦|減|cut|體脂/i.test(t))type='loss';
-  if(lift&&kg&&!/增重|減重|體重/.test(t))type='lift';
+  if(lift&&liftKg&&!/增重|減重/.test(t)){type='lift';kg=liftKg}
   if(type==='general'&&/跑|耐力|體能|心肺|體測|馬拉松|有氧|游泳/.test(t))type='endurance';
   return {type,kg:Number.isFinite(kg)?kg:null,abs:Number.isFinite(abs)?abs:null,weeks:Number.isFinite(weeks)&&weeks>0?Math.round(weeks*10)/10:null,lift:lift?lift[1]:null};
 }
