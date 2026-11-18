@@ -163,7 +163,7 @@ nav.tabs button.on{color:var(--acc);font-weight:700}
 </div>
 <script>
 (function(){
-  var Q=['成功的男人，是不需要被定義的。','今天的痠痛，是明天的線條。','鐵不會說謊，100 公斤永遠是 100 公斤。','不用很厲害才開始，但要開始才會很厲害。','最難的一組，是走進健身房的那一步。','肌肉不會背叛你，只是會讓你等。','汗水，是脂肪在哭。','你唯一的對手，是沙發。','再一下。對，就是那一下。','不是重量太重，是你還沒變強。','身材，是最誠實的履歷。','強者不是不累，是累了還在。','你練的不是肌肉，是說到做到。','把手機放下，把啞鈴拿起來。','未來的你，會謝謝現在的你。','不用完美，只要出現。','休息是為了練更重，不是為了不練。','真正的強者，從不跳過腿日。','成功的路上不擁擠，因為大家還在床上。','汗流得越多，藉口就越少。','一個月後，你會慶幸今天有開始。','自信，是一組一組練出來的。','沒有捷徑，但有計畫。','比昨天多一下，就是贏。','不爽的時候，就去推鐵。','別問效果在哪，先問自己練了沒。','把「明天開始」，換成「現在開始」。','慢慢來，比較快。','自律的人，最自由。','今天不想練？那就先練一組就好。','先做到，再做好。','衣服變緊不是胖，是你長大了。','你的極限，比你以為的還遠一點。','重量會進步，人也會。','練完的那一刻，什麼煩惱都輕了。','累，代表你正在變強。','不跟別人比，只跟昨天的自己比。','狀態不好也要練，因為狀態是練出來的。','沒有白流的汗，只有還沒到的成果。','今天的你，值得一場好訓練。'];
+  var Q=['怕輸才會緊張，想贏才會興奮！'];
   var el=document.getElementById('splash'),q=document.getElementById('splashQ'),done=false,t;
   function pick(){var last=-1;try{last=+localStorage.getItem('ft-lastq')}catch(e){}var i;do{i=Math.floor(Math.random()*Q.length)}while(i===last&&Q.length>1);try{localStorage.setItem('ft-lastq',i)}catch(e){}return Q[i]}
   function hide(){if(done)return;done=true;clearTimeout(t);el.classList.add('out');setTimeout(function(){el.style.display='none'},460)}
