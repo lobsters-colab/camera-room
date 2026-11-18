@@ -1254,7 +1254,13 @@ void main(){
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     return canvas;
   }
-  return { render, maxSide, canvas };
+  // give back GPU memory after a big one-off render (iOS keeps canvas memory tight)
+  function release() {
+    canvas.width = canvas.height = 1; srcKey = null;
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texSrc);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3));
+  }
+  return { render, release, maxSide, canvas };
 }
 const GPU = makeGPU();
 
@@ -3187,6 +3193,11 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfor
 const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
 const camBody = () => CAM_BODIES.find(b => b.id === C.body) || CAM_BODIES[0];
 let VF = null; // viewfinder GPU context (owns the visible canvas)
+const CAM_VERSION = "2026-11-18b";
+// longest side of a captured photo; iPhone Safari runs out of canvas memory with several 12 MP canvases alive
+let CAP = 2560;
+// iOS frees canvas memory only when the size drops to zero, so shrink canvases we are done with
+const freeCanvas = (...cs) => { for (const x of cs) if (x && x.width) { x.width = 0; x.height = 0; } };
 
 function camPrefsLoad() {
   try {
@@ -3299,7 +3310,7 @@ function camLoop() {
 }
 // keep the face exposure estimate fresh from a tiny frame
 function camMeter(v, view, P, adj) {
-  const t = document.createElement("canvas"), k = 160 / Math.max(v.videoWidth, v.videoHeight);
+  const t = camMeter.c || (camMeter.c = document.createElement("canvas")), k = 160 / Math.max(v.videoWidth, v.videoHeight);
   t.width = Math.round(v.videoWidth * k); t.height = Math.round(v.videoHeight * k);
   const x = t.getContext("2d", { willReadFrequently: true }); x.drawImage(v, 0, 0, t.width, t.height);
   const skin = sampleSkin(x.getImageData(0, 0, t.width, t.height).data, t.width, t.height);
@@ -3309,10 +3320,13 @@ function camMeter(v, view, P, adj) {
 // raw frame: rotation fixed, mirrored for selfies, cropped to the ratio, at full stream resolution
 function camGrab() {
   const v = $("camVideo"), view = camView(v.videoWidth, v.videoHeight, camDigitalZoom());
-  const out = document.createElement("canvas"); out.width = Math.round(view.cw); out.height = Math.round(view.ch);
+  const k = Math.min(1, CAP / Math.max(view.cw, view.ch));
+  const out = document.createElement("canvas"); out.width = Math.round(view.cw * k); out.height = Math.round(view.ch * k);
   const x = out.getContext("2d");
+  if (!x) throw new Error("grab: 無法建立畫布");
   x.save();
   x.translate(out.width / 2, out.height / 2);
+  x.scale(k, k);
   if (view.mirror) x.scale(-1, 1);
   x.rotate(view.rot * Math.PI / 2);
   // after rotation the source is drawn centred; the crop is the visible window
@@ -3405,8 +3419,20 @@ function develop(raw, bodyId, lens, seed, date, flashLook) {
   if (L.leak || (b.leak && r() < b.leak)) addLeak(ctx, W, H, r);
   if (L.dust || b.dust) addDust(ctx, W, H, r, L.dust ? 1 : b.dust);
   if (b.stamp || L.stamp) drawStamp(ctx, W, H, { stamp: true, stampText: fmtStamp(date || new Date()) });
-  if (b.frame) { const fr = document.createElement("canvas"); compose(fr, out, b.frame === "polasq" ? "pola" : b.frame, ""); return fr; }
+  if (GPU && GPU.release) GPU.release();
+  if (b.frame) { const fr = document.createElement("canvas"); compose(fr, out, b.frame === "polasq" ? "pola" : b.frame, ""); freeCanvas(out); return fr; }
   return out;
+}
+// develop, and if the phone runs short of memory try again smaller
+function developSafe(raw, bodyId, lens, seed, date, flashLook) {
+  try { const o = develop(raw, bodyId, lens, seed, date, flashLook); if (o && o.width) return { out: o, raw }; throw new Error("空白結果"); }
+  catch (e) {
+    if (GPU && GPU.release) GPU.release();
+    if (Math.max(raw.width, raw.height) <= 1400) throw e;
+    CAP = 1600;
+    const small = scaledCanvas(raw, 1600); freeCanvas(raw);
+    return { out: develop(small, bodyId, lens, seed, date, flashLook), raw: small };
+  }
 }
 const blobOf = (c, q) => new Promise(res => c.toBlob(res, "image/jpeg", q || 0.92));
 async function canvasOfBlob(blob) { const bmp = await createImageBitmap(blob); const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; c.getContext("2d").drawImage(bmp, 0, 0); if (bmp.close) bmp.close(); return c; }
@@ -3451,12 +3477,17 @@ async function camShoot() {
       if (C.facing === "user") { $("camScreenFlash").hidden = false; await new Promise(r => setTimeout(r, 320)); }
       else if (C.caps.torch) { try { await C.track.applyConstraints({ advanced: [{ torch: true }] }); torchOn = true; await new Promise(r => setTimeout(r, 450)); } catch (e) {} }
     }
+    C.stage = "擷取畫面";
     let raw = camGrab();
     shutterFX();
     if (torchOn) C.track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
     $("camScreenFlash").hidden = true;
     await finishShot(raw, C.flash === "on" && !C.caps.torch && C.facing !== "user");
-  } catch (e) { say("拍照失敗，請再試一次"); }
+  } catch (e) {
+    console.error(e);
+    say(`拍照失敗（${C.stage || "?"}：${(e && (e.message || e.name)) || e}）。請截圖給我`, true);
+  }
+  C.stage = "";
   C.busy = false;
 }
 async function finishShot(raw, flashLook) {
@@ -3464,13 +3495,20 @@ async function finishShot(raw, flashLook) {
   // double exposure and half-frame wait for a second frame
   if (lens.double || b.half) {
     if (!C.pending) { C.pending = { raw, kind: b.half ? "half" : "double" }; camGhost(raw); say(b.half ? "半格：再拍一張，會並排在同一張" : "雙重曝光：再拍一張疊上去"); camRenderUI(); return; }
-    const first = C.pending.raw; C.pending = null; camGhost(null);
-    raw = b.half ? halfPair(first, raw) : screenBlend(first, raw);
+    const first = C.pending.raw, second = raw; C.pending = null; camGhost(null);
+    raw = b.half ? halfPair(first, second) : screenBlend(first, second);
+    freeCanvas(first, second);
   }
   say("沖洗中…", true); await tick();
-  const seed = (Math.random() * 1e9) | 0, out = develop(raw, b.id, lens, seed, date, flashLook);
-  const shot = { id: uid(), date: date.getTime(), body: b.id, lens, seed, flashLook: !!flashLook, raw: await blobOf(raw, 0.95), out: await blobOf(out, 0.92) };
+  C.stage = "沖洗";
+  const seed = (Math.random() * 1e9) | 0, dv = developSafe(raw, b.id, lens, seed, date, flashLook), out = dv.out;
+  raw = dv.raw;
+  C.stage = "存檔";
+  const rawBlob = await blobOf(raw, 0.92), outBlob = await blobOf(out, 0.92);
+  if (!rawBlob || !outBlob) throw new Error("存檔: 轉成 JPEG 失敗");
+  const shot = { id: uid(), date: date.getTime(), body: b.id, lens, seed, flashLook: !!flashLook, raw: rawBlob, out: outBlob };
   shot.thumb = coverThumb(out, 140);
+  freeCanvas(raw, out);
   C.roll.unshift(shot); RollDB.put(shot);
   camRenderUI(); say(`已存進底片盒（${C.roll.length}）`);
 }
@@ -3483,10 +3521,11 @@ $("camHQFile").onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   say("讀取照片中…", true);
   try {
-    const bmp = await createImageBitmap(f, { imageOrientation: "from-image" }), full = scaledCanvas(bmp, 4032);
+    const bmp = await createImageBitmap(f, { imageOrientation: "from-image" }), full = scaledCanvas(bmp, Math.max(CAP, 3000));
     if (bmp.close) bmp.close();
-    await finishShot(cropToRatio(full, CAM_RATIOS[C.ratio]), false);
-  } catch (err) { say("這張照片讀不出來"); }
+    const crop = cropToRatio(full, CAM_RATIOS[C.ratio]); freeCanvas(full);
+    await finishShot(crop, false);
+  } catch (err) { console.error(err); say(`這張照片處理失敗（${(err && err.message) || err}）`, true); }
 };
 
 // ---------- UI ----------
@@ -3565,8 +3604,11 @@ async function rollRender() {
     btn.onclick = async () => {
       if (s.body === b.id) return;
       say("重新沖洗中…", true); await tick();
-      const raw = await canvasOfBlob(s.raw), out = develop(raw, b.id, s.lens, s.seed, new Date(s.date), s.flashLook);
-      s.body = b.id; s.out = await blobOf(out, 0.92); s.thumb = coverThumb(out, 140); RollDB.put(s); rollRender(); camRenderUI(); say(`已用 ${b.name} 重新沖洗`);
+      try {
+        const raw = await canvasOfBlob(s.raw), out = develop(raw, b.id, s.lens, s.seed, new Date(s.date), s.flashLook);
+        s.body = b.id; s.out = await blobOf(out, 0.92); s.thumb = coverThumb(out, 140); freeCanvas(raw, out);
+        RollDB.put(s); rollRender(); camRenderUI(); say(`已用 ${b.name} 重新沖洗`);
+      } catch (e) { say(`重新沖洗失敗（${(e && e.message) || e}）`, true); }
     };
     re.appendChild(btn);
   }
@@ -3606,6 +3648,8 @@ function camProbe() {
     ["以主畫面 App 執行", isStandalone() ? "是" : "否（在瀏覽器裡）"],
     ["錄影", yes(!!window.MediaRecorder)],
     ["WebGPU", yes(!!navigator.gpu)],
+    ["拍照尺寸上限", CAP + " px"],
+    ["App 版本", CAM_VERSION],
   ];
   if (s.frameRate) rows.splice(1, 0, ["畫面更新率", Math.round(s.frameRate) + " fps"]);
   $("probeRows").innerHTML = rows.map(([k, val]) => `<tr><th>${k}</th><td>${val}</td></tr>`).join("");
