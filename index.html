@@ -206,6 +206,76 @@ input.sec { width: 64px; flex: none; text-align: center; }
 .field { font-size: 14px; }
 .panel { height: 236px; }
 
+
+/* camera */
+.app.cam > .topbar { display: none; }
+.card.wide { grid-column: 1 / -1; min-height: 0; }
+.cammode { background: #000; }
+.camtop { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); }
+.camtools { flex: 1; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.camtools::-webkit-scrollbar { display: none; }
+.cpill { flex: none; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #141416; color: var(--text); font-size: 13px; font-weight: 500; }
+.cpill[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.camstage { position: relative; flex: 1; min-height: 160px; overflow: hidden; }
+.camfit { position: absolute; inset: 0 8px; display: grid; place-items: center; }
+.camwrap { position: relative; line-height: 0; }
+#camCanvas { display: block; border-radius: 4px; background: #0b0b0c; }
+.camover { position: absolute; inset: 0; pointer-events: none; }
+#camGhost { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .38; }
+#camGhost[hidden] { display: none; }
+.camgrid { position: absolute; inset: 0; background-image: linear-gradient(90deg, transparent calc(33.33% - .5px), rgba(255,255,255,.35) calc(33.33% - .5px), rgba(255,255,255,.35) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.35) calc(66.66% - .5px), rgba(255,255,255,.35) calc(66.66% + .5px), transparent calc(66.66% + .5px)), linear-gradient(transparent calc(33.33% - .5px), rgba(255,255,255,.35) calc(33.33% - .5px), rgba(255,255,255,.35) calc(33.33% + .5px), transparent calc(33.33% + .5px), transparent calc(66.66% - .5px), rgba(255,255,255,.35) calc(66.66% - .5px), rgba(255,255,255,.35) calc(66.66% + .5px), transparent calc(66.66% + .5px)); }
+.camgrid[hidden] { display: none; }
+.camname { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); margin: 0; padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,.55); font-family: var(--font-display); font-size: 11px; color: var(--accent); white-space: nowrap; pointer-events: none; }
+.camzoom { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 6px; }
+.camzoom button { width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: var(--text); font-size: 12px; font-weight: 700; }
+.camzoom button[aria-pressed="true"] { color: var(--accent); background: rgba(0,0,0,.8); }
+.camcount { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-size: 96px; color: #fff; text-shadow: 0 4px 20px rgba(0,0,0,.6); pointer-events: none; }
+.camcount[hidden] { display: none; }
+.cammsg { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; background: rgba(0,0,0,.85); }
+.cammsg[hidden] { display: none; }
+.cammsg p { margin: 0; font-size: 14px; line-height: 1.6; }
+.cammsg .save { min-height: 44px; }
+.cammsg [hidden] { display: none; }
+.camlens { flex: none; padding-top: 10px; padding-bottom: 4px; }
+.camlens button[aria-pressed="true"] { background: var(--accent); color: #1a1006; }
+.camlens button:disabled { opacity: 1; }
+.cambodies { flex: none; padding-top: 6px; padding-bottom: 6px; }
+.cbody { flex: none; width: 70px; padding: 6px 0; border: 1px solid transparent; border-radius: 12px; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); }
+.cbody canvas { width: 44px; height: 44px; }
+.cbody span { font-size: 12px; font-weight: 700; color: var(--text); }
+.cbody small { font-size: 10px; }
+.cbody[aria-pressed="true"] { border-color: var(--accent); background: #1c1612; }
+.cambar { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 8px 24px; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+.camroll { justify-self: start; position: relative; width: 52px; height: 52px; border-radius: 10px; border: 2px solid var(--line); background: #141416; padding: 0; overflow: hidden; }
+.camroll img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.camroll b { position: absolute; right: 2px; bottom: 2px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #1a1006; font-size: 10px; }
+.shutter { width: 76px; height: 76px; border-radius: 50%; border: 4px solid #fff; background: transparent; padding: 4px; }
+.shutter i { display: block; width: 100%; height: 100%; border-radius: 50%; background: #fff; transition: transform .1s; }
+.shutter:active i { transform: scale(.88); }
+.shutter.hq i { background: var(--accent); }
+.camflip { justify-self: end; width: 48px; height: 48px; border-radius: 50%; border: 0; background: #1d1d20; color: var(--text); display: grid; place-items: center; }
+.camflip svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.vidhide { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+.camfx { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 20; }
+.camfx.shot { animation: camshot .22s ease-out; }
+@keyframes camshot { 0% { opacity: .9; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .camfx.shot { animation: none; } }
+.screenflash { position: fixed; inset: 0; background: #fff; z-index: 30; }
+.screenflash[hidden] { display: none; }
+.sheet { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; gap: 10px; padding-bottom: max(12px, env(safe-area-inset-bottom)); overflow-y: auto; }
+.sheet[hidden] { display: none; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; padding-top: max(12px, env(safe-area-inset-top)); font-weight: 700; }
+.rollview { flex: none; display: grid; place-items: center; padding: 0 16px; }
+.rollview img { max-width: 100%; max-height: 52vh; border-radius: 4px; }
+.btnrow.wrap { flex-wrap: wrap; }
+.rollgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0 16px; }
+.rollitem { padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; aspect-ratio: 1; background: #141416; }
+.rollitem img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rollitem[aria-pressed="true"] { border-color: var(--accent); }
+.probe-t { margin: 0 16px; border-collapse: collapse; font-size: 14px; }
+.probe-t th { text-align: left; font-weight: 500; color: var(--muted); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.probe-t td { padding: 8px 0; border-bottom: 1px solid var(--line); }
+
 /* templates */
 .tpl { position: relative; flex: none; width: 76px; padding: 0; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--muted); }
 .tpl canvas, .tpl i { width: 76px; height: 76px; border-radius: 10px; display: grid; place-items: center; background: var(--raise); border: 2px solid transparent; }
@@ -258,12 +328,13 @@ input.sec { width: 64px; flex: none; text-align: center; }
   <input id="rMusic" class="vh" type="file" accept="audio/*" tabindex="-1" aria-label="選擇音樂">
 
   <div class="mode home" id="mode-home">
-    <button class="hero card" type="button" data-go="auto">
+    <button class="hero card" type="button" data-go="cam">
       <span class="hero-art" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span class="card-t">一鍵美化</span>
-      <span class="card-d">選一張照片，自動判斷場景，套用最適合的風格</span>
+      <span class="card-t">相機</span>
+      <span class="card-d">即時濾鏡取景，10 台底片／CCD 相機，漏光、魚眼、雙重曝光</span>
     </button>
     <div class="cards">
+      <button class="card wide" type="button" data-go="auto"><svg viewBox="0 0 24 24"><path d="M10 4l1.6 4.4L16 10l-4.4 1.6L10 16l-1.6-4.4L4 10l4.4-1.6z"/><path d="M17.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg><span class="card-t">一鍵美化</span><span class="card-d">選一張照片，自動判斷場景，套用最適合的風格</span></button>
       <button class="card" type="button" data-go="collage"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 12h17M12 3.5v17"/></svg><span class="card-t">拼貼</span><span class="card-d">多選照片，自動挑好的排版</span></button>
       <button class="card" type="button" data-go="reel"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10.5 9.5l4 2.5-4 2.5z"/></svg><span class="card-t">回顧影片</span><span class="card-d">照片配音樂，跟著節拍切換</span></button>
       <button class="card" type="button" data-go="filter"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="5.5"/><circle cx="15" cy="9" r="5.5"/><circle cx="12" cy="15" r="5.5"/></svg><span class="card-t">濾鏡調色</span><span class="card-d">富士、柯達、G7X 等 19 款</span></button>
@@ -371,6 +442,55 @@ input.sec { width: 64px; flex: none; text-align: center; }
       <button type="button" role="tab" data-tab="music" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>音樂</button>
       <button type="button" role="tab" data-tab="text" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13M9 19h6"/></svg>文字</button>
     </nav>
+  </div>
+  <div class="mode cammode" id="mode-cam" hidden>
+    <div class="camtop">
+      <button class="tbtn" id="camBack" type="button">‹ 首頁</button>
+      <div class="camtools">
+        <button class="cpill" id="camFlash" type="button"></button>
+        <button class="cpill" id="camTimer" type="button"></button>
+        <button class="cpill" id="camRatio" type="button" aria-label="畫面比例"></button>
+        <button class="cpill" id="camGridBtn" type="button" aria-label="格線">格線</button>
+        <button class="cpill" id="camHQ" type="button" aria-label="HQ：用原生相機拍">HQ</button>
+        <button class="cpill" id="camInfo" type="button" aria-label="相機檢測">檢測</button>
+      </div>
+    </div>
+    <div class="camstage">
+      <div class="camfit" id="camFit"><div class="camwrap">
+        <canvas id="camCanvas" aria-label="取景器"></canvas>
+        <div class="camover" id="camOver"><img id="camGhost" alt="" hidden><div class="camgrid" id="camGrid" hidden></div></div>
+      </div></div>
+      <p class="camname" id="camBodyName"></p>
+      <div class="camzoom" id="camZooms" role="group" aria-label="變焦"></div>
+      <div class="camcount" id="camCount" hidden></div>
+      <div class="cammsg" id="camMsg" hidden><p id="camMsgText">正在開啟相機…</p><button class="save" id="camRetry" type="button">允許使用相機</button><button class="tbtn" id="camMsgHQ" type="button">改用 HQ 原生相機</button></div>
+      <p class="status" role="status"></p>
+    </div>
+    <div class="hscroll pills camlens" id="camLenses" role="group" aria-label="鏡頭配件"></div>
+    <div class="hscroll cambodies" id="camBodies" role="group" aria-label="相機機身"></div>
+    <div class="cambar">
+      <button class="camroll" id="camRollBtn" type="button" aria-label="底片盒"></button>
+      <button class="shutter" id="camShutter" type="button" aria-label="拍照"><i></i></button>
+      <button class="camflip" id="camFlip" type="button" aria-label="切換前後鏡頭"><svg viewBox="0 0 24 24"><path d="M4 9a8 8 0 0 1 14-3l2 2M20 4v4h-4M20 15a8 8 0 0 1-14 3l-2-2M4 20v-4h4"/></svg></button>
+    </div>
+    <video id="camVideo" class="vidhide" playsinline muted autoplay></video>
+    <input id="camHQFile" class="vh" type="file" accept="image/*" capture="environment" tabindex="-1" aria-label="用原生相機拍照">
+    <div class="camfx" id="camFlashFx"></div>
+    <div class="screenflash" id="camScreenFlash" hidden></div>
+    <div class="sheet" id="roll" hidden>
+      <div class="sheet-head"><span id="rollCount"></span><button class="tbtn" id="rollClose" type="button">關閉</button></div>
+      <div class="rollview"><img id="rollImg" alt="照片"></div>
+      <p class="note pad">換一台相機重新沖洗：</p>
+      <div class="hscroll pills" id="rollBodies"></div>
+      <div class="pad btnrow wrap"><button class="save" id="rollSave" type="button">儲存</button><button class="tbtn" id="rollSaveAll" type="button">全部儲存</button><button class="tbtn" id="rollEdit" type="button">拿去修圖</button><button class="tbtn" id="rollCollage" type="button">做成拼貼</button><button class="tbtn" id="rollDel" type="button">刪除</button></div>
+      <div class="rollgrid" id="rollGrid"></div>
+    </div>
+    <div class="sheet probe" id="probe" hidden>
+      <div class="sheet-head"><span>這支手機的相機能力</span><button class="tbtn" id="probeClose" type="button">關閉</button></div>
+      <table class="probe-t"><tbody id="probeRows"></tbody></table>
+      <p class="note pad">畫面如果是歪的（轉了 90°），按「旋轉校正」直到正確為止，會記住設定。</p>
+      <div class="pad btnrow"><button class="tbtn" id="probeRot" type="button">旋轉校正</button><button class="tbtn" id="probeRotAuto" type="button">恢復自動</button></div>
+    </div>
   </div>
 </div>
 
@@ -1018,8 +1138,9 @@ async function eraseAI(full, maskCanvas) {
 }
 
 // ---------- GPU grading (WebGL): same recipe as core(), fast enough for live dragging ----------
-const GPU = (() => {
-  const canvas = document.createElement("canvas");
+// a factory, so the camera viewfinder can own a second context
+function makeGPU(canvas) {
+  canvas = canvas || document.createElement("canvas");
   let gl = null;
   try { gl = canvas.getContext("webgl", { preserveDrawingBuffer: true, premultipliedAlpha: false, antialias: false, alpha: false }); } catch (e) {}
   if (!gl) return null;
@@ -1029,12 +1150,37 @@ const GPU = (() => {
   const FS = `precision ${prec} float;
 varying vec2 vUv;
 uniform sampler2D uSrc,uHal;
-uniform float uG,uR,uK,uFade,uSat,uSt,uGrain,uChroma,uVig,uHalAmt,uBW,uSeed,uLift;
+uniform float uG,uR,uK,uFade,uSat,uSt,uGrain,uChroma,uVig,uHalAmt,uBW,uSeed,uLift,uRot,uMirror,uFish,uPrism,uAspect;
+uniform vec4 uCrop;
 uniform vec3 uMul,uOff,uSh,uHi,uBWw;
 const vec3 LW=vec3(.299,.587,.114);
 float h12(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
+// display uv (after crop, zoom, mirror and rotation fix) -> source texture uv
+vec2 mapUv(vec2 d){
+  vec2 p=uCrop.xy+d*uCrop.zw;
+  if(uMirror>.5)p.x=1.-p.x;
+  if(uRot>.5&&uRot<1.5)p=vec2(1.-p.y,p.x);
+  else if(uRot>1.5&&uRot<2.5)p=vec2(1.-p.x,1.-p.y);
+  else if(uRot>2.5)p=vec2(p.y,1.-p.x);
+  return p;
+}
+vec3 samp(vec2 d){return texture2D(uSrc,mapUv(clamp(d,0.,1.))).rgb;}
 void main(){
-  vec3 o=texture2D(uSrc,vUv).rgb;
+  vec2 d=vUv;float mask=1.;
+  if(uFish>0.){
+    vec2 c=d-.5;c.x*=uAspect;float r=length(c);
+    float f=1.+uFish*(r*r*1.9-.5);
+    c*=f;c.x/=uAspect;d=.5+c;
+    float lim=.5*min(1.,uAspect);
+    mask=1.-smoothstep(lim-.012,lim,r*(uAspect>1.?1.:1.));
+  }
+  vec3 o;
+  if(uPrism>0.){
+    vec2 s=vec2(.011*uPrism,0.);
+    o=vec3(samp(d+s).r,samp(d).g,samp(d-s).b);
+    vec3 gh=samp(d+vec2(.07,.03)*uPrism);
+    o=max(o,mix(o,gh,.42*uPrism));
+  } else o=samp(d);
   vec3 c=o;
   if(uBW>.5){float v=dot(c,uBWw);c=vec3(v);}
   c=pow(clamp(c+uLift,0.,1.),vec3(uG));
@@ -1052,7 +1198,7 @@ void main(){
   c=o+(c-o)*uSt;
   if(uGrain>0.){vec2 q=gl_FragCoord.xy+uSeed;float n=(h12(q)+h12(q+17.3)+h12(q+41.7)-1.5)*2.*uGrain*uSt;
     vec3 ch=vec3(h12(q+3.1),h12(q+7.7),h12(q+11.9))-.5;c+=n+ch*uChroma;}
-  gl_FragColor=vec4(clamp(c,0.,1.),1.);
+  gl_FragColor=vec4(clamp(c,0.,1.)*mask,1.);
 }`;
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
   let prog;
@@ -1068,7 +1214,7 @@ void main(){
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, "p");
   gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = {}; ["uSrc","uHal","uG","uR","uK","uFade","uSat","uSt","uGrain","uChroma","uVig","uHalAmt","uBW","uSeed","uLift","uMul","uOff","uSh","uHi","uBWw"].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  const U = {}; ["uSrc","uHal","uG","uR","uK","uFade","uSat","uSt","uGrain","uChroma","uVig","uHalAmt","uBW","uSeed","uLift","uRot","uMirror","uFish","uPrism","uAspect","uCrop","uMul","uOff","uSh","uHi","uBWw"].forEach(n => U[n] = gl.getUniformLocation(prog, n));
   const mkTex = () => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); return t; };
@@ -1080,13 +1226,16 @@ void main(){
   let srcKey = null, srcVer = -1;
 
   function render(src, P, o, hal) {
-    const W = src.width, H = src.height;
-    if (W > maxSide || H > maxSide || gl.isContextLost()) return null;
+    const isVid = typeof HTMLVideoElement !== "undefined" && src instanceof HTMLVideoElement;
+    const sw = isVid ? src.videoWidth : src.width, sh = isVid ? src.videoHeight : src.height;
+    if (!sw || !sh) return null;
+    const W = o.outW || sw, H = o.outH || sh;
+    if (sw > maxTex || sh > maxTex || W > maxSide || H > maxSide || gl.isContextLost()) return null;
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     gl.viewport(0, 0, W, H);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texSrc);
     const ver = src.__ver || 0;
-    if (srcKey !== src || srcVer !== ver) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src); srcKey = src; srcVer = ver; }
+    if (isVid || srcKey !== src || srcVer !== ver) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src); srcKey = src; srcVer = ver; }
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texHal);
     if (hal) gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, hal.w, hal.h, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, hal.data);
     else gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, 1, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, new Uint8Array([0]));
@@ -1097,13 +1246,17 @@ void main(){
     gl.uniform1f(U.uGrain, grain); gl.uniform1f(U.uChroma, P.bw ? 0 : grain * 0.35 * o.strength);
     gl.uniform1f(U.uVig, P.vig); gl.uniform1f(U.uHalAmt, hal ? P.hal : 0);
     gl.uniform1f(U.uBW, P.bw ? 1 : 0); gl.uniform3fv(U.uBWw, P.bw || [0.299, 0.587, 0.114]);
-    gl.uniform1f(U.uSeed, 37.0); gl.uniform1f(U.uLift, P.lift);
+    gl.uniform1f(U.uSeed, o.seed != null ? o.seed : 37.0); gl.uniform1f(U.uLift, P.lift);
+    const v = o.view || {}, cr = v.crop || [0, 0, 1, 1];
+    gl.uniform4f(U.uCrop, cr[0], cr[1], cr[2], cr[3]); gl.uniform1f(U.uRot, v.rot || 0); gl.uniform1f(U.uMirror, v.mirror ? 1 : 0);
+    gl.uniform1f(U.uFish, P.fish || 0); gl.uniform1f(U.uPrism, P.prism || 0); gl.uniform1f(U.uAspect, W / H);
     gl.uniform3fv(U.uMul, P.mul); gl.uniform3fv(U.uOff, P.off); gl.uniform3fv(U.uSh, P.sh); gl.uniform3fv(U.uHi, P.hi);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     return canvas;
   }
-  return { render, maxSide };
-})();
+  return { render, maxSide, canvas };
+}
+const GPU = makeGPU();
 
 // Small blurred map of bright lights, for the CineStill-style glow.
 function halMap(src, P, ex) {
@@ -3008,13 +3161,478 @@ function showRTab(t) {
   renderRTab();
 }
 
+// =====================================================================
+// Camera mode: live filtered viewfinder, camera bodies, lens add-ons,
+// flash/timer/zoom, a film roll you can re-develop, and a native HQ path.
+// =====================================================================
+const CAM_BODIES = [
+  { id: "g7x",  name: "G7X",        sub: "Y2K 數位",   filter: "g7x",   adj: {}, stamp: true, color: "#2a2a2e", accent: "#c9c9cf" },
+  { id: "ccd",  name: "CCD",        sub: "老卡片機",   filter: "ccd",   adj: { grain: 140 }, stamp: true, color: "#c0c4cc", accent: "#3a5a8c" },
+  { id: "fxn",  name: "FXN",        sub: "富士紀實",   filter: "cc",    adj: {}, color: "#1f1f1f", accent: "#b8b0a0" },
+  { id: "portra", name: "P400",     sub: "人像底片",   filter: "portra", adj: {}, leak: 0.3, dust: 0.5, color: "#e6dccb", accent: "#7a5a3a" },
+  { id: "gold", name: "Gold",       sub: "即可拍",     filter: "dispo", adj: {}, leak: 0.65, dust: 1, flashLook: true, stamp: true, color: "#f2c230", accent: "#1f1c19" },
+  { id: "inst", name: "Inst SQ",    sub: "拍立得",     filter: "pola",  adj: {}, frame: "polasq", ratio: "1:1", leak: 0.25, color: "#f3efe6", accent: "#e04a3a" },
+  { id: "half", name: "Half",       sub: "半格雙拼",   filter: "superia", adj: {}, half: true, dust: 0.6, color: "#3b4a3f", accent: "#d8d2c2" },
+  { id: "bw",   name: "Tri-X",      sub: "黑白街拍",   filter: "trix",  adj: {}, dust: 0.8, color: "#141414", accent: "#eeeeee" },
+  { id: "night", name: "800T",      sub: "夜景光暈",   filter: "cine",  adj: {}, color: "#2b3a55", accent: "#ff7a59" },
+  { id: "fish", name: "Fisheye",    sub: "魚眼",       filter: "ektar", adj: { sat: 10 }, lens: { fish: true }, color: "#8a3ffc", accent: "#ffd23f" },
+];
+const LENSES = [["fish", "魚眼"], ["prism", "稜鏡"], ["star", "星芒"], ["leak", "漏光"], ["double", "雙重曝光"], ["dust", "灰塵刮痕"]];
+const CAM_RATIOS = { "3:4": 4 / 3, "1:1": 1, "9:16": 16 / 9 };
+const C = {
+  body: "g7x", lens: {}, ratio: "3:4", flash: "off", timer: 0, grid: false, facing: "environment", zoom: 1, hq: false,
+  stream: null, track: null, caps: {}, rot: 0, rotAuto: true, raf: 0, roll: [], pending: null, ex: { G: 0.97, R: 0.12 }, exT: 0, busy: false,
+};
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+const camBody = () => CAM_BODIES.find(b => b.id === C.body) || CAM_BODIES[0];
+let VF = null; // viewfinder GPU context (owns the visible canvas)
+
+function camPrefsLoad() {
+  try {
+    const s = JSON.parse(localStorage.getItem("darkroom-cam") || "null"); if (!s) return;
+    if (CAM_BODIES.some(b => b.id === s.body)) C.body = s.body;
+    if (CAM_RATIOS[s.ratio]) C.ratio = s.ratio;
+    C.flash = s.flash === "on" ? "on" : "off"; C.timer = [0, 3, 10].includes(s.timer) ? s.timer : 0; C.grid = !!s.grid;
+    if (typeof s.rot === "number" && !s.rotAuto) { C.rot = s.rot; C.rotAuto = false; }
+    C.lens = s.lens && typeof s.lens === "object" ? s.lens : {};
+  } catch (e) {}
+}
+function camPrefsSave() {
+  try { localStorage.setItem("darkroom-cam", JSON.stringify({ body: C.body, ratio: C.ratio, flash: C.flash, timer: C.timer, grid: C.grid, rot: C.rot, rotAuto: C.rotAuto, lens: C.lens })); } catch (e) {}
+}
+
+// ---------- Roll persistence (IndexedDB, best effort) ----------
+const RollDB = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    try { const r = indexedDB.open("darkroom-roll", 1); r.onupgradeneeded = () => r.result.createObjectStore("shots", { keyPath: "id" }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }
+    catch (e) { rej(e); }
+  }));
+  const tx = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => { const t = db.transaction("shots", mode), s = t.objectStore("shots"); const out = fn(s); t.oncomplete = () => res(out && out.result); t.onerror = () => rej(t.error); }); };
+  return {
+    put: shot => tx("readwrite", s => s.put(shot)).catch(() => {}),
+    del: id => tx("readwrite", s => s.delete(id)).catch(() => {}),
+    all: () => tx("readonly", s => s.getAll()).catch(() => []),
+  };
+})();
+
+// ---------- Camera stream ----------
+async function camStart() {
+  camStop();
+  const box = $("camMsg");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camMessage("這個瀏覽器不能開相機。可以改用「HQ」原生相機拍照。"); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: C.facing }, width: { ideal: 4032 }, height: { ideal: 3024 } } });
+    C.stream = stream; C.track = stream.getVideoTracks()[0];
+    C.caps = C.track.getCapabilities ? C.track.getCapabilities() : {};
+    const v = $("camVideo"); v.srcObject = stream; v.muted = true; v.playsInline = true;
+    await v.play().catch(() => {});
+    await new Promise(r => { if (v.videoWidth) r(); else v.onloadedmetadata = () => r(); setTimeout(r, 2500); });
+    box.hidden = true;
+    if (C.rotAuto) {
+      // iOS 26 home-screen apps can deliver frames turned 90°: a landscape frame while the phone is upright
+      const portrait = innerHeight > innerWidth;
+      C.rot = isIOS && isStandalone() && portrait && v.videoWidth > v.videoHeight ? 1 : 0;
+    }
+    if (C.zoom > 1) camApplyZoom(C.zoom);
+    camLoop(); camRenderUI();
+  } catch (e) {
+    const denied = e && (e.name === "NotAllowedError" || e.name === "SecurityError");
+    camMessage(denied ? "沒有相機權限。請點下面的按鈕再試一次；如果一直被拒絕，到「設定 → Safari → 相機」改成允許。" : "相機打不開（可能正被其他 App 使用）。也可以改用「HQ」原生相機拍照。", true);
+  }
+}
+function camStop() {
+  cancelAnimationFrame(C.raf); C.raf = 0;
+  if (C.stream) C.stream.getTracks().forEach(t => t.stop());
+  C.stream = null; C.track = null;
+  const v = $("camVideo"); if (v) v.srcObject = null;
+}
+function camMessage(text, retry) {
+  const box = $("camMsg"); box.hidden = false;
+  $("camMsgText").textContent = text; $("camRetry").hidden = !retry;
+}
+document.addEventListener("visibilitychange", () => {
+  if (state.mode !== "cam") return;
+  if (document.hidden) camStop(); else camStart();
+});
+
+// geometry of the frame after the rotation fix, crop to the chosen ratio and zoom
+function camView(vw, vh, z) {
+  const rot = C.rot % 4, dw = rot % 2 ? vh : vw, dh = rot % 2 ? vw : vh, ratio = CAM_RATIOS[C.ratio];
+  let cw = dw, ch = dw * ratio; if (ch > dh) { ch = dh; cw = dh / ratio; }
+  cw /= z; ch /= z;
+  return { dw, dh, cw, ch, crop: [(1 - cw / dw) / 2, (1 - ch / dh) / 2, cw / dw, ch / dh], rot, mirror: C.facing === "user" };
+}
+function camDigitalZoom() { return C.caps.zoom ? 1 : C.zoom; }
+function camApplyZoom(z) {
+  C.zoom = z;
+  if (C.track && C.caps.zoom) {
+    const zz = Math.min(C.caps.zoom.max, Math.max(C.caps.zoom.min, z));
+    C.track.applyConstraints({ advanced: [{ zoom: zz }] }).catch(() => {});
+  }
+}
+function camP() {
+  const b = camBody(), f = FILTERS.find(x => x.id === b.filter) || FILTERS[0];
+  const adj = Object.fromEntries(PARAMS.map(p => [p.id, p.def])); Object.assign(adj, b.adj || {});
+  const P = effP(f.p, adj);
+  const lens = { ...C.lens, ...(b.lens || {}) };
+  P.fish = lens.fish ? 1 : 0; P.prism = lens.prism ? 1 : 0;
+  return { P, adj, lens, b };
+}
+function camLoop() {
+  const v = $("camVideo"), cv = $("camCanvas");
+  const step = () => {
+    C.raf = requestAnimationFrame(step);
+    if (!v.videoWidth || !VF) return;
+    const box = $("camFit"), bw = box.clientWidth, bh = box.clientHeight; if (!bw || !bh) return;
+    const view = camView(v.videoWidth, v.videoHeight, camDigitalZoom()), ratio = CAM_RATIOS[C.ratio];
+    let w = bw, h = bw * ratio; if (h > bh) { h = bh; w = bh / ratio; }
+    const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(Math.min(1080, w * dpr)), H = Math.round(W * ratio);
+    cv.style.width = Math.floor(w) + "px"; cv.style.height = Math.floor(h) + "px";
+    $("camOver").style.width = cv.style.width; $("camOver").style.height = cv.style.height;
+    const { P, adj } = camP(), now = performance.now();
+    if (now - C.exT > 1200) { C.exT = now; camMeter(v, view, P, adj); }
+    VF.render(v, P, { outW: W, outH: H, view, exposure: C.ex, strength: 1, grain: adj.grain / 100, seed: (now / 70) % 97 }, null);
+  };
+  step();
+}
+// keep the face exposure estimate fresh from a tiny frame
+function camMeter(v, view, P, adj) {
+  const t = document.createElement("canvas"), k = 160 / Math.max(v.videoWidth, v.videoHeight);
+  t.width = Math.round(v.videoWidth * k); t.height = Math.round(v.videoHeight * k);
+  const x = t.getContext("2d", { willReadFrequently: true }); x.drawImage(v, 0, 0, t.width, t.height);
+  const skin = sampleSkin(x.getImageData(0, 0, t.width, t.height).data, t.width, t.height);
+  C.ex = solveExposure(skin, P, state.autoFace, adj.bright / 10);
+}
+
+// raw frame: rotation fixed, mirrored for selfies, cropped to the ratio, at full stream resolution
+function camGrab() {
+  const v = $("camVideo"), view = camView(v.videoWidth, v.videoHeight, camDigitalZoom());
+  const out = document.createElement("canvas"); out.width = Math.round(view.cw); out.height = Math.round(view.ch);
+  const x = out.getContext("2d");
+  x.save();
+  x.translate(out.width / 2, out.height / 2);
+  if (view.mirror) x.scale(-1, 1);
+  x.rotate(view.rot * Math.PI / 2);
+  // after rotation the source is drawn centred; the crop is the visible window
+  x.drawImage(v, -v.videoWidth / 2, -v.videoHeight / 2);
+  x.restore();
+  return out;
+}
+function cropToRatio(src, ratio) {
+  let w = src.width, h = w * ratio; if (h > src.height) { h = src.height; w = h / ratio; }
+  const c = document.createElement("canvas"); c.width = Math.round(w); c.height = Math.round(h);
+  c.getContext("2d").drawImage(src, (src.width - w) / 2, (src.height - h) / 2, w, h, 0, 0, c.width, c.height);
+  return c;
+}
+
+// ---------- Developing a shot ----------
+function rnd(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
+function addLeak(ctx, W, H, r) {
+  ctx.save(); ctx.globalCompositeOperation = "screen";
+  const n = 1 + Math.floor(r() * 2);
+  for (let i = 0; i < n; i++) {
+    const side = Math.floor(r() * 4), along = r();
+    const x = side === 0 ? 0 : side === 1 ? W : along * W, y = side === 2 ? 0 : side === 3 ? H : along * H, rad = Math.max(W, H) * (0.35 + r() * 0.4);
+    const hue = [[255, 90, 30], [255, 150, 40], [255, 60, 90], [255, 200, 90]][Math.floor(r() * 4)];
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(${hue},.85)`); g.addColorStop(0.45, `rgba(${hue},.35)`); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
+}
+function addDust(ctx, W, H, r, amt) {
+  ctx.save();
+  const u = Math.max(W, H) / 1000, n = Math.round(40 * amt);
+  for (let i = 0; i < n; i++) {
+    ctx.fillStyle = r() < 0.6 ? `rgba(255,255,255,${0.25 + r() * 0.4})` : `rgba(20,16,12,${0.25 + r() * 0.35})`;
+    ctx.beginPath(); ctx.arc(r() * W, r() * H, (0.6 + r() * 2.2) * u, 0, 7); ctx.fill();
+  }
+  ctx.lineWidth = 0.8 * u;
+  for (let i = 0; i < Math.round(4 * amt); i++) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.12 + r() * 0.2})`;
+    const x = r() * W, y = r() * H, len = (60 + r() * 260) * u, a = (r() - 0.5) * 0.6 + (r() < 0.5 ? Math.PI / 2 : 0);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + Math.cos(a) * len * 0.5 + (r() - 0.5) * 20 * u, y + Math.sin(a) * len * 0.5, x + Math.cos(a) * len, y + Math.sin(a) * len); ctx.stroke();
+  }
+  ctx.restore();
+}
+// star filter: streaks from the brightest small spots
+function addStars(ctx, W, H) {
+  const s = 96 / Math.max(W, H), w = Math.max(8, Math.round(W * s)), h = Math.max(8, Math.round(H * s));
+  const t = document.createElement("canvas"); t.width = w; t.height = h;
+  const tx = t.getContext("2d", { willReadFrequently: true }); tx.drawImage(ctx.canvas, 0, 0, w, h);
+  const d = tx.getImageData(0, 0, w, h).data, pts = [];
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = (y*w + x) * 4, l = (d[i] + d[i+1] + d[i+2]) / 765;
+    if (l < 0.86) continue;
+    let peak = true;
+    for (let dy = -1; dy <= 1 && peak; dy++) for (let dx = -1; dx <= 1; dx++) { const j = ((y+dy)*w + x+dx) * 4; if ((d[j] + d[j+1] + d[j+2]) / 765 > l) { peak = false; break; } }
+    if (peak) pts.push({ x: x / s, y: y / s, l });
+  }
+  pts.sort((a, b) => b.l - a.l);
+  const chosen = [];
+  for (const p of pts) { if (chosen.length >= 10) break; if (!chosen.some(c => Math.hypot(c.x - p.x, c.y - p.y) < Math.max(W, H) * 0.06)) chosen.push(p); }
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  for (const p of chosen) {
+    const L = Math.max(W, H) * (0.05 + (p.l - 0.86) * 0.9);
+    for (let k = 0; k < 4; k++) {
+      const a = Math.PI / 4 + k * Math.PI / 2, g = ctx.createLinearGradient(p.x, p.y, p.x + Math.cos(a) * L, p.y + Math.sin(a) * L);
+      g.addColorStop(0, "rgba(255,250,235,.9)"); g.addColorStop(1, "rgba(255,250,235,0)");
+      ctx.strokeStyle = g; ctx.lineWidth = Math.max(1.2, Math.max(W, H) * 0.0025); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(a) * L, p.y + Math.sin(a) * L); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function addFlashLook(ctx, W, H) {
+  ctx.save(); ctx.globalCompositeOperation = "soft-light";
+  const g = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.max(W, H) * 0.75);
+  g.addColorStop(0, "rgba(255,255,255,.55)"); g.addColorStop(0.55, "rgba(255,255,255,0)"); g.addColorStop(1, "rgba(0,0,0,.45)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); ctx.restore();
+}
+// raw canvas -> finished photo canvas, using one camera body's look; seed keeps leaks/dust the same on re-develop
+function develop(raw, bodyId, lens, seed, date, flashLook) {
+  const b = CAM_BODIES.find(x => x.id === bodyId) || CAM_BODIES[0], f = FILTERS.find(x => x.id === b.filter) || FILTERS[0];
+  const adj = Object.fromEntries(PARAMS.map(p => [p.id, p.def])); Object.assign(adj, b.adj || {});
+  const P = effP(f.p, adj), L = { ...lens, ...(b.lens || {}) };
+  P.fish = L.fish ? 1 : 0; P.prism = L.prism ? 1 : 0;
+  const skin = (() => { const s = scaledCanvas(raw, 400); return sampleSkin(s.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, s.width, s.height).data, s.width, s.height); })();
+  const out = document.createElement("canvas");
+  renderGraded(out, raw, P, { exposure: solveExposure(skin, P, state.autoFace, 0), strength: 1, grain: adj.grain / 100, stamp: false });
+  const ctx = out.getContext("2d"), W = out.width, H = out.height, r = rnd(seed);
+  if (flashLook || b.flashLook) addFlashLook(ctx, W, H);
+  if (L.star) addStars(ctx, W, H);
+  if (L.leak || (b.leak && r() < b.leak)) addLeak(ctx, W, H, r);
+  if (L.dust || b.dust) addDust(ctx, W, H, r, L.dust ? 1 : b.dust);
+  if (b.stamp || L.stamp) drawStamp(ctx, W, H, { stamp: true, stampText: fmtStamp(date || new Date()) });
+  if (b.frame) { const fr = document.createElement("canvas"); compose(fr, out, b.frame === "polasq" ? "pola" : b.frame, ""); return fr; }
+  return out;
+}
+const blobOf = (c, q) => new Promise(res => c.toBlob(res, "image/jpeg", q || 0.92));
+async function canvasOfBlob(blob) { const bmp = await createImageBitmap(blob); const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height; c.getContext("2d").drawImage(bmp, 0, 0); if (bmp.close) bmp.close(); return c; }
+function screenBlend(a, b) {
+  const c = document.createElement("canvas"); c.width = a.width; c.height = a.height;
+  const x = c.getContext("2d"); x.drawImage(a, 0, 0); x.globalCompositeOperation = "screen"; x.globalAlpha = 0.85; x.drawImage(b, 0, 0, c.width, c.height);
+  return c;
+}
+function halfPair(a, b) {
+  const w = Math.max(a.width, b.width), h = Math.max(a.height, b.height), gap = Math.round(w * 0.04);
+  const c = document.createElement("canvas"); c.width = w * 2 + gap; c.height = h;
+  const x = c.getContext("2d"); x.fillStyle = "#0e0d0c"; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(a, 0, 0, w, h); x.drawImage(b, w + gap, 0, w, h);
+  return c;
+}
+
+// ---------- Taking a picture ----------
+function shutterFX() {
+  const f = $("camFlashFx"); f.classList.remove("shot"); void f.offsetWidth; f.classList.add("shot");
+  try { navigator.vibrate && navigator.vibrate(15); } catch (e) {}
+  try {
+    const ac = getAC(); if (ac.state === "suspended") ac.resume();
+    const n = ac.createBufferSource(), buf = ac.createBuffer(1, ac.sampleRate * 0.08, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ac.sampleRate * 0.012)) * 0.5;
+    const g = ac.createGain(); g.gain.value = 0.35; n.buffer = buf; n.connect(g); g.connect(ac.destination); n.start();
+  } catch (e) {}
+}
+async function countdown(sec) {
+  const el = $("camCount");
+  for (let s = sec; s > 0; s--) { el.textContent = s; el.hidden = false; await new Promise(r => setTimeout(r, 1000)); }
+  el.hidden = true;
+}
+async function camShoot() {
+  if (C.busy) return;
+  if (C.hq) { $("camHQFile").click(); return; }
+  const v = $("camVideo"); if (!v.videoWidth) { say("相機還沒準備好"); return; }
+  C.busy = true;
+  try {
+    if (C.timer) await countdown(C.timer);
+    let torchOn = false;
+    if (C.flash === "on") {
+      if (C.facing === "user") { $("camScreenFlash").hidden = false; await new Promise(r => setTimeout(r, 320)); }
+      else if (C.caps.torch) { try { await C.track.applyConstraints({ advanced: [{ torch: true }] }); torchOn = true; await new Promise(r => setTimeout(r, 450)); } catch (e) {} }
+    }
+    let raw = camGrab();
+    shutterFX();
+    if (torchOn) C.track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+    $("camScreenFlash").hidden = true;
+    await finishShot(raw, C.flash === "on" && !C.caps.torch && C.facing !== "user");
+  } catch (e) { say("拍照失敗，請再試一次"); }
+  C.busy = false;
+}
+async function finishShot(raw, flashLook) {
+  const b = camBody(), lens = { ...C.lens }, date = new Date();
+  // double exposure and half-frame wait for a second frame
+  if (lens.double || b.half) {
+    if (!C.pending) { C.pending = { raw, kind: b.half ? "half" : "double" }; camGhost(raw); say(b.half ? "半格：再拍一張，會並排在同一張" : "雙重曝光：再拍一張疊上去"); camRenderUI(); return; }
+    const first = C.pending.raw; C.pending = null; camGhost(null);
+    raw = b.half ? halfPair(first, raw) : screenBlend(first, raw);
+  }
+  say("沖洗中…", true); await tick();
+  const seed = (Math.random() * 1e9) | 0, out = develop(raw, b.id, lens, seed, date, flashLook);
+  const shot = { id: uid(), date: date.getTime(), body: b.id, lens, seed, flashLook: !!flashLook, raw: await blobOf(raw, 0.95), out: await blobOf(out, 0.92) };
+  shot.thumb = coverThumb(out, 140);
+  C.roll.unshift(shot); RollDB.put(shot);
+  camRenderUI(); say(`已存進底片盒（${C.roll.length}）`);
+}
+function camGhost(raw) {
+  const g = $("camGhost");
+  if (!raw) { g.hidden = true; return; }
+  const c = scaledCanvas(raw, 900); g.src = c.toDataURL("image/jpeg", 0.7); g.hidden = false;
+}
+$("camHQFile").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  say("讀取照片中…", true);
+  try {
+    const bmp = await createImageBitmap(f, { imageOrientation: "from-image" }), full = scaledCanvas(bmp, 4032);
+    if (bmp.close) bmp.close();
+    await finishShot(cropToRatio(full, CAM_RATIOS[C.ratio]), false);
+  } catch (err) { say("這張照片讀不出來"); }
+};
+
+// ---------- UI ----------
+function bodyIcon(b, size) {
+  const c = document.createElement("canvas"); c.width = c.height = size * 2; const x = c.getContext("2d"), s = size * 2;
+  x.fillStyle = b.color; rrPath(x, s * 0.08, s * 0.28, s * 0.84, s * 0.52, s * 0.08); x.fill();
+  x.fillStyle = b.accent; x.fillRect(s * 0.14, s * 0.2, s * 0.2, s * 0.1);
+  x.beginPath(); x.arc(s * 0.54, s * 0.54, s * 0.19, 0, 7); x.fillStyle = "#111"; x.fill();
+  x.beginPath(); x.arc(s * 0.54, s * 0.54, s * 0.12, 0, 7); x.fillStyle = "#2b3a55"; x.fill();
+  x.beginPath(); x.arc(s * 0.5, s * 0.5, s * 0.035, 0, 7); x.fillStyle = "rgba(255,255,255,.7)"; x.fill();
+  x.fillStyle = b.accent; x.fillRect(s * 0.74, s * 0.34, s * 0.1, s * 0.07);
+  return c;
+}
+function camRenderUI() {
+  const bodies = $("camBodies");
+  if (!bodies.children.length) for (const b of CAM_BODIES) {
+    const btn = el("button", "cbody"); btn.type = "button"; btn.dataset.id = b.id;
+    btn.appendChild(bodyIcon(b, 44)); btn.appendChild(el("span", null, b.name)); btn.appendChild(el("small", null, b.sub));
+    btn.onclick = () => { C.body = b.id; if (b.ratio) C.ratio = b.ratio; C.pending = null; camGhost(null); camPrefsSave(); camRenderUI(); say(`${b.name}：${b.sub}`); };
+    bodies.appendChild(btn);
+  }
+  [...bodies.children].forEach(x => x.setAttribute("aria-pressed", String(x.dataset.id === C.body)));
+  const lenses = $("camLenses"); lenses.innerHTML = "";
+  const b = camBody();
+  for (const [k, label] of LENSES) {
+    const forced = b.lens && b.lens[k], on = !!(C.lens[k] || forced);
+    const btn = el("button", null, label); btn.type = "button"; btn.setAttribute("aria-pressed", String(on)); btn.disabled = !!forced;
+    btn.onclick = () => { C.lens[k] = !C.lens[k]; if (k === "double" && !C.lens.double) { C.pending = null; camGhost(null); } camPrefsSave(); camRenderUI(); };
+    lenses.appendChild(btn);
+  }
+  $("camFlash").textContent = C.flash === "on" ? "閃光 開" : "閃光 關"; $("camFlash").setAttribute("aria-pressed", String(C.flash === "on"));
+  $("camTimer").textContent = C.timer ? `計時 ${C.timer}s` : "計時 關"; $("camTimer").setAttribute("aria-pressed", String(!!C.timer));
+  $("camRatio").textContent = C.ratio;
+  $("camHQ").setAttribute("aria-pressed", String(C.hq));
+  $("camGrid").hidden = !C.grid;
+  const zh = $("camZooms"); zh.innerHTML = "";
+  for (const z of [1, 2, 3]) { const btn = el("button", null, z + "x"); btn.type = "button"; btn.setAttribute("aria-pressed", String(C.zoom === z)); btn.onclick = () => { camApplyZoom(z); camRenderUI(); }; zh.appendChild(btn); }
+  const r0 = C.roll[0];
+  $("camRollBtn").innerHTML = r0 ? `<img src="${r0.thumb}" alt=""><b>${C.roll.length}</b>` : "";
+  $("camRollBtn").setAttribute("aria-label", `底片盒，${C.roll.length} 張`);
+  $("camBodyName").textContent = `${b.name} · ${b.sub}` + (C.pending ? (C.pending.kind === "half" ? " · 半格 1/2" : " · 雙重曝光 1/2") : "") + (C.hq ? " · HQ 原生相機" : "");
+  $("camShutter").classList.toggle("hq", C.hq);
+}
+$("camFlash").onclick = () => { C.flash = C.flash === "on" ? "off" : "on"; camPrefsSave(); camRenderUI(); if (C.flash === "on" && C.facing !== "user" && !C.caps.torch) say("這支手機的網頁不能用閃光燈，改用閃光效果"); };
+$("camTimer").onclick = () => { C.timer = C.timer === 0 ? 3 : C.timer === 3 ? 10 : 0; camPrefsSave(); camRenderUI(); };
+$("camRatio").onclick = () => { const k = Object.keys(CAM_RATIOS); C.ratio = k[(k.indexOf(C.ratio) + 1) % k.length]; camPrefsSave(); camRenderUI(); };
+$("camGridBtn").onclick = () => { C.grid = !C.grid; camPrefsSave(); camRenderUI(); };
+$("camHQ").onclick = () => { C.hq = !C.hq; camRenderUI(); say(C.hq ? "HQ：用 iPhone 原生相機拍，畫質最好，拍完自動套用目前相機" : "回到即時濾鏡取景"); };
+$("camFlip").onclick = () => { C.facing = C.facing === "user" ? "environment" : "user"; C.zoom = 1; camStart(); };
+$("camShutter").onclick = camShoot;
+$("camRetry").onclick = () => camStart();
+$("camMsgHQ").onclick = () => { C.hq = true; camRenderUI(); $("camHQFile").click(); };
+$("camBack").onclick = () => setMode("home");
+$("camInfo").onclick = () => camProbe();
+
+// ---------- Film roll viewer ----------
+let rollSel = null;
+function rollOpen() { $("roll").hidden = false; rollRender(); }
+$("camRollBtn").onclick = () => { if (C.roll.length) rollOpen(); else say("還沒有照片，先拍一張"); };
+$("rollClose").onclick = () => { $("roll").hidden = true; rollSel = null; };
+async function rollRender() {
+  const grid = $("rollGrid"); grid.innerHTML = "";
+  $("rollCount").textContent = `底片盒 · ${C.roll.length} 張`;
+  for (const s of C.roll) {
+    const b = el("button", "rollitem"); b.type = "button"; b.setAttribute("aria-pressed", String(rollSel === s.id));
+    b.innerHTML = `<img src="${s.thumb}" alt="">`; b.onclick = () => { rollSel = s.id; rollRender(); };
+    grid.appendChild(b);
+  }
+  const s = C.roll.find(x => x.id === rollSel) || C.roll[0];
+  if (!s) { $("roll").hidden = true; return; }
+  rollSel = s.id;
+  const url = URL.createObjectURL(s.out), img = $("rollImg"); if (img.dataset.url) URL.revokeObjectURL(img.dataset.url); img.src = url; img.dataset.url = url;
+  const re = $("rollBodies"); re.innerHTML = "";
+  for (const b of CAM_BODIES) {
+    const btn = el("button", null, b.name); btn.type = "button"; btn.setAttribute("aria-pressed", String(s.body === b.id));
+    btn.onclick = async () => {
+      if (s.body === b.id) return;
+      say("重新沖洗中…", true); await tick();
+      const raw = await canvasOfBlob(s.raw), out = develop(raw, b.id, s.lens, s.seed, new Date(s.date), s.flashLook);
+      s.body = b.id; s.out = await blobOf(out, 0.92); s.thumb = coverThumb(out, 140); RollDB.put(s); rollRender(); camRenderUI(); say(`已用 ${b.name} 重新沖洗`);
+    };
+    re.appendChild(btn);
+  }
+}
+$("rollSave").onclick = async () => { const s = C.roll.find(x => x.id === rollSel); if (!s) return; const r = await deliver({ blob: s.out, name: `cam_${s.body}_${dayKey(new Date(s.date))}.jpg` }, false); say(r === "saved" ? "已儲存" : r === "declined" ? "已取消" : ""); };
+$("rollSaveAll").onclick = async () => { let n = 0; for (const s of C.roll) { const r = await deliver({ blob: s.out, name: `cam_${s.body}_${s.id}.jpg` }, C.roll.length > 1); if (r === "declined") break; n++; } say(`已處理 ${n} 張`); };
+$("rollDel").onclick = () => { const i = C.roll.findIndex(x => x.id === rollSel); if (i < 0) return; RollDB.del(C.roll[i].id); C.roll.splice(i, 1); rollSel = C.roll[i] ? C.roll[i].id : C.roll[0] ? C.roll[0].id : null; camRenderUI(); if (!C.roll.length) $("roll").hidden = true; else rollRender(); };
+$("rollEdit").onclick = async () => {
+  const s = C.roll.find(x => x.id === rollSel); if (!s) return;
+  const c = await canvasOfBlob(s.out);
+  state.photos = state.photos.filter(p => !p.sample);
+  addPhoto(c, `cam_${s.id}.jpg`, false, new Date(s.date)); state.cur = state.photos.length - 1;
+  $("roll").hidden = true; setMode("edit"); renderThumbs(); renderChips(); renderTemplates(); renderEraseTools(); renderPreview();
+};
+$("rollCollage").onclick = async () => {
+  const s = C.roll.find(x => x.id === rollSel); if (!s) return;
+  const files = C.roll.map(x => new File([x.out], `cam_${x.id}.jpg`, { type: "image/jpeg", lastModified: x.date }));
+  $("roll").hidden = true; setMode("collage");
+  await importToLib(files);
+  R.proj = newProject(gridFor(Math.min(9, files.length)), dedupe(R.lib).slice(0, 9).map(x => x.id)); R.sel = null;
+  showCTab("tpl"); cDirty();
+};
+
+// ---------- What this phone's camera can do (the probe) ----------
+function camProbe() {
+  const t = C.track, s = t && t.getSettings ? t.getSettings() : {}, c = C.caps || {}, v = $("camVideo");
+  const yes = b => b ? "可以" : "不行";
+  const rows = [
+    ["目前畫面解析度", v.videoWidth ? `${v.videoWidth} × ${v.videoHeight}` : "相機未開啟"],
+    ["最高可要求解析度", c.width && c.height ? `${c.width.max} × ${c.height.max}` : "瀏覽器沒有提供"],
+    ["閃光燈（手電筒式）", yes(!!c.torch)],
+    ["硬體變焦", c.zoom ? `可以（${c.zoom.min}–${c.zoom.max}x）` : "不行，改用數位變焦"],
+    ["對焦控制", yes(!!(c.focusMode && c.focusMode.length > 1))],
+    ["曝光控制", yes(!!c.exposureCompensation)],
+    ["白平衡控制", yes(!!(c.whiteBalanceMode && c.whiteBalanceMode.length > 1))],
+    ["畫面方向校正", C.rot ? `已旋轉 ${C.rot * 90}°${C.rotAuto ? "（自動）" : "（手動）"}` : "不需要"],
+    ["以主畫面 App 執行", isStandalone() ? "是" : "否（在瀏覽器裡）"],
+    ["錄影", yes(!!window.MediaRecorder)],
+    ["WebGPU", yes(!!navigator.gpu)],
+  ];
+  if (s.frameRate) rows.splice(1, 0, ["畫面更新率", Math.round(s.frameRate) + " fps"]);
+  $("probeRows").innerHTML = rows.map(([k, val]) => `<tr><th>${k}</th><td>${val}</td></tr>`).join("");
+  $("probe").hidden = false;
+}
+$("probeClose").onclick = () => { $("probe").hidden = true; };
+$("probeRot").onclick = () => { C.rot = (C.rot + 1) % 4; C.rotAuto = false; camPrefsSave(); camProbe(); say(`畫面旋轉 ${C.rot * 90}°`); };
+$("probeRotAuto").onclick = () => { C.rotAuto = true; camPrefsSave(); camStart().then(camProbe); };
+
+async function camEnter() {
+  if (!VF) VF = makeGPU($("camCanvas"));
+  if (!VF) { camMessage("這支手機不支援即時濾鏡取景，可以改用「HQ」原生相機拍照。", false); return; }
+  if (!C.loaded) { C.loaded = true; camPrefsLoad(); const saved = await RollDB.all(); if (saved && saved.length) C.roll = saved.sort((a, b) => b.date - a.date); }
+  camRenderUI();
+  await camStart();
+}
+
 // ---------- Mode switching and wiring for collage / video ----------
 state.mode = "home";
-const MODE_TITLE = { home: "濾鏡暗房", edit: "修圖", collage: "拼貼", reel: "回顧影片" };
+const MODE_TITLE = { home: "濾鏡暗房", edit: "修圖", collage: "拼貼", reel: "回顧影片", cam: "相機" };
 function setMode(m) {
   if (state.mode === "reel" && m !== "reel") rStop();
+  if (state.mode === "cam" && m !== "cam") camStop();
   state.mode = m;
-  ["home", "edit", "collage", "reel"].forEach(k => $("mode-" + k).hidden = k !== m);
+  ["home", "edit", "collage", "reel", "cam"].forEach(k => $("mode-" + k).hidden = k !== m);
+  document.querySelector(".app").classList.toggle("cam", m === "cam");
+  if (m === "cam") { camEnter(); return; }
   $("ttl").textContent = MODE_TITLE[m];
   $("backBtn").hidden = $("addLabel").hidden = $("saveOne").hidden = m === "home";
   $("addLabel").htmlFor = m === "edit" ? "file" : "cFile";
@@ -3035,6 +3653,7 @@ $("cCoachOk").onclick = () => { $("cCoach").hidden = true; try { localStorage.se
 $("cHelp").onclick = () => { $("cCoach").hidden = false; };
 // home cards: pick photos first, then land on the right tool
 const GO = {
+  cam: () => setMode("cam"),
   auto: () => { window.afterEditLoad = () => { goEditTab("tpl"); const rec = recommend(curPhoto()), t = TEMPLATES.find(x => x.id === rec.id); if (t) { applyTemplate(t); say(`判斷為${rec.why}，已套用「${t.name}」，下面可以換別的`); } }; $("file").click(); },
   filter: () => { window.afterEditLoad = () => goEditTab("filter"); $("file").click(); },
   erase: () => { window.afterEditLoad = () => { goEditTab("erase"); say("用手指把要消除的地方塗紅，或按「AI 找路人」"); }; $("file").click(); },
