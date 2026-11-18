@@ -163,7 +163,7 @@ nav.tabs button.on{color:var(--acc);font-weight:700}
 </div>
 <script>
 (function(){
-  var Q=['怕輸才會緊張，想贏才會興奮！'];
+  var Q=['怕輸才會緊張，想贏就會興奮！'];
   var el=document.getElementById('splash'),q=document.getElementById('splashQ'),done=false,t;
   function pick(){var last=-1;try{last=+localStorage.getItem('ft-lastq')}catch(e){}var i;do{i=Math.floor(Math.random()*Q.length)}while(i===last&&Q.length>1);try{localStorage.setItem('ft-lastq',i)}catch(e){}return Q[i]}
   function hide(){if(done)return;done=true;clearTimeout(t);el.classList.add('out');setTimeout(function(){el.style.display='none'},460)}
