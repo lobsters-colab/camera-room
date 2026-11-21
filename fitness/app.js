@@ -71,7 +71,11 @@ const fromKg=(kg,u)=>u==='lb'?kg/LB:kg;
 const rnd5=x=>Math.round(x*2)/2;
 const wIn=(kg,u)=>rnd5(fromKg(kg,u));
 const fmtW=(kg,u)=>{u=u||prefU();return wIn(kg,u)+' '+u};
-const setTxt=(e,s)=>{const u=e.wu||'kg';const wv=s.w>0?wIn(s.w,u):0;return unitOf(e)==='分鐘'?(s.w>0?s.w+' km · ':'')+s.r+' 分':(wv?wv+(u==='lb'?' lb':'')+(unitOf(e)==='秒'?' ':'×'):'')+s.r+(unitOf(e)==='秒'?'秒':'')};
+const setTxt=(e,s)=>{const u=e.wu||'kg';const wv=s.w>0?wIn(s.w,u):0;const sd=e.side==='single'?'/邊':'';return unitOf(e)==='分鐘'?(s.w>0?s.w+' km · ':'')+s.r+' 分':(wv?wv+(u==='lb'?' lb':'')+sd+(unitOf(e)==='秒'?' ':'×'):'')+s.r+(unitOf(e)==='秒'?'秒':'')};
+// 單邊／雙邊：預設依動作判斷，之後記住上次的選擇
+const UNI=/啞鈴|單臂|單手|單腳|單側|保加利亞|弓箭步|登階/;
+const defSide=name=>UNI.test(name)&&!/臀推|仰臥拉舉|高腳杯|前蹲|側彎|抓舉/.test(name)?'single':'both';
+const lastSide=name=>{const w=S.workouts.find(w=>w.ex.some(e=>e.name===name&&e.side));return w?w.ex.find(e=>e.name===name&&e.side).side:null};
 
 function options(pat,eq){const n=LIB[pat].n;const l=eq==='gym'?[...n.gym,...n.db]:eq==='db'?[...n.db,...n.bw]:[...n.bw];return [...new Set(l)]}
 const BWSET=new Set(Object.values(LIB).flatMap(x=>x.n.bw));
@@ -206,7 +210,7 @@ function exHistory(name){
   return S.workouts.filter(w=>w.ex.some(e=>e.name===name)).slice().reverse().map(w=>({date:w.date,e:w.ex.find(e=>e.name===name)}));
 }
 const e1rm=e=>Math.max(0,...e.sets.filter(s=>s.w>0&&s.r>0&&unitOf(e)==='次').map(s=>s.w*(1+Math.min(s.r,12)/30)));
-const vol=w=>w.ex.reduce((a,e)=>a+(unitOf(e)!=='次'?0:e.sets.reduce((b,s)=>b+(+s.w||0)*(+s.r||0),0)),0);
+const vol=w=>w.ex.reduce((a,e)=>a+(unitOf(e)!=='次'?0:e.sets.reduce((b,s)=>b+(+s.w||0)*(+s.r||0),0)*(e.side==='single'?2:1)),0);
 const incFor=(name,group,u)=>u==='lb'?(/啞鈴/.test(name)?5:group==='腿'?10:5):(/啞鈴/.test(name)?2:group==='腿'?5:2.5);
 const lastUnit=name=>{const w=S.workouts.find(w=>w.ex.some(e=>e.name===name&&e.wu));return w?w.ex.find(e=>e.name===name&&e.wu).wu:null};
 function progressHint(ex){
@@ -537,8 +541,9 @@ function startSession(dayIdx,parts){
 }
 function mkSessEx(e){
   const wu=e.unit==='分鐘'?'kg':(lastUnit(e.name)||prefU());
+  const side=e.unit==='分鐘'?null:(lastSide(e.name)||defSide(e.name));
   const h=progressHint({...e,wu});const w=h&&h.w?h.w:'';
-  return {name:e.name,pattern:e.pattern,group:e.group,unit:e.unit,wu,target:{sets:e.sets,min:e.min,max:e.max,rest:e.rest},
+  return {name:e.name,pattern:e.pattern,group:e.group,unit:e.unit,wu,side,target:{sets:e.sets,min:e.min,max:e.max,rest:e.rest},
     sets:Array.from({length:e.sets},()=>({w:(isBW(e.name)&&e.unit!=='分鐘')?'':w,r:'',done:false}))};
 }
 const elapsed=s=>Math.max(0,((s.pausedAt||Date.now())-s.started-(s.pausedMs||0))/1000);
@@ -549,7 +554,7 @@ let tickInt;
 function startTick(){clearInterval(tickInt);tickInt=setInterval(()=>{const el=document.getElementById('elapsed');if(el&&S.session)el.textContent=hms(elapsed(S.session))},1000)}
 function finishSession(){
   const s=S.session;
-  const ex=s.ex.map(e=>{const u=e.unit==='分鐘'?'kg':(e.wu||'kg');return {name:e.name,pattern:e.pattern||'',group:groupOf(e),unit:e.unit||'次',wu:u,target:e.target||null,
+  const ex=s.ex.map(e=>{const u=e.unit==='分鐘'?'kg':(e.wu||'kg');return {name:e.name,pattern:e.pattern||'',group:groupOf(e),unit:e.unit||'次',wu:u,side:e.unit==='分鐘'?null:(e.side||'both'),target:e.target||null,
     sets:e.sets.filter(x=>+x.r>0).map(x=>({w:e.unit==='分鐘'?(+x.w||0):Math.round(((x._kg!=null&&String(x._w)===String(x.w))?x._kg:toKg(+x.w||0,u))*1000)/1000,r:+x.r}))}}).filter(e=>e.sets.length);
   if(!ex.length){toast('還沒有記錄任何一組（至少填入次數或時間）');return}
   const dur=Math.max(60,Math.round(elapsed(s)));
@@ -666,10 +671,11 @@ function vSession(){
   s.ex.forEach((e,i)=>{
     const t=e.target;const ph=progressHint({name:e.name,group:e.group,min:t&&t.min,max:t&&t.max,wu:e.wu||'kg'});const u=e.wu||'kg';
     const bw=isBW(e.name);
-    h+=`<div class="card exc"><div class="row between"><div>${ptag(groupOf(e))}<span class="nm">${esc(e.name)}</span></div><div class="row" style="gap:4px">${e.unit!=='分鐘'?`<span class="useg"><button class="${u==='kg'?'on':''}" data-act="wu" data-e="${i}" data-u="kg">kg</button><button class="${u==='lb'?'on':''}" data-act="wu" data-e="${i}" data-u="lb">lb</button></span>`:''}<button class="btn sm ghost" data-act="exDel" data-e="${i}" aria-label="移除">✕</button></div></div>
+    h+=`<div class="card exc"><div class="row between"><div>${ptag(groupOf(e))}<span class="nm">${esc(e.name)}</span></div><button class="btn sm ghost" data-act="exDel" data-e="${i}" aria-label="移除">✕</button></div>
+    ${e.unit!=='分鐘'?`<div class="row" style="gap:8px;margin-top:8px"><span class="useg"><button class="${(e.side||'both')==='both'?'on':''}" data-act="side" data-e="${i}" data-s="both">雙邊</button><button class="${e.side==='single'?'on':''}" data-act="side" data-e="${i}" data-s="single">單邊</button></span><span class="useg"><button class="${u==='kg'?'on':''}" data-act="wu" data-e="${i}" data-u="kg">kg</button><button class="${u==='lb'?'on':''}" data-act="wu" data-e="${i}" data-u="lb">lb</button></span></div>`:''}
     ${t?`<div class="small muted" style="margin-top:4px">${e.unit==='分鐘'?`目標 ${t.min}–${t.max} 分鐘，中等強度（能講話但無法唱歌）`:`目標 ${t.sets} 組 × ${t.min}–${t.max} ${e.unit||'次'} · 休息 ${t.rest} 秒`}</div>`:''}
     ${ph?`<div class="hint ${ph.up?'':'neutral'}">${esc(ph.txt)}<br>→ ${esc(ph.tip)}</div>`:''}
-    <div class="colhd"><span>組</span><span>${e.unit==='分鐘'?'距離 km（選填）':bw?`負重 ${u}（選填）`:`重量 ${u}`}</span><span>${e.unit||'次'}</span><span></span></div>
+    <div class="colhd"><span>組</span><span>${e.unit==='分鐘'?'距離 km（選填）':bw?`負重 ${u}（選填）`:`重量 ${u}${e.side==='single'?'（單邊）':''}`}</span><span>${e.unit||'次'}</span><span></span></div>
     ${e.sets.map((x,j)=>`<div class="setrow ${x.done?'done':''}"><span class="n">${j+1}</span><input inputmode="decimal" type="number" step="0.5" data-in="w" data-e="${i}" data-s="${j}" value="${esc(x.w)}" placeholder="${e.unit==='分鐘'?'km':bw?'0':u}"><input inputmode="numeric" type="number" data-in="r" data-e="${i}" data-s="${j}" value="${esc(x.r)}" placeholder="${t?t.min+'–'+t.max:''}"><button class="ck" data-act="ck" data-e="${i}" data-s="${j}" aria-label="完成這組">✓</button></div>`).join('')}
     <div class="row" style="margin-top:10px"><button class="btn sm" data-act="setAdd" data-e="${i}">＋ 加一組</button>${e.sets.length>1?`<button class="btn sm ghost" data-act="setDel" data-e="${i}">－ 刪最後一組</button>`:''}</div></div>`;
   });
@@ -859,8 +865,9 @@ const ACT={
   exAdd:()=>{const [k,n]=$('#addSel').value.split('|');const p=S.profile||{goal:'muscle',level:'int',equip:'gym'};const rx=prescribe(p,k,1,n);
     S.session.ex.push(mkSessEx({name:n,pattern:k,group:LIB[k].g,...rx}));saveSession();render(true);toast('已加入 '+n)},
   exCustom:()=>{const n=$('#custName').value.trim();if(!n){toast('請輸入動作名稱');return}const g=$('#custG').value;
-    const cd=g==='體能';S.session.ex.push({name:n,pattern:'',group:g,unit:cd?'分鐘':'次',wu:cd?'kg':(lastUnit(n)||prefU()),target:null,sets:Array.from({length:cd?1:3},()=>({w:'',r:'',done:false}))});saveSession();render(true)},
+    const cd=g==='體能';S.session.ex.push({name:n,pattern:'',group:g,unit:cd?'分鐘':'次',wu:cd?'kg':(lastUnit(n)||prefU()),side:cd?null:(lastSide(n)||defSide(n)),target:null,sets:Array.from({length:cd?1:3},()=>({w:'',r:'',done:false}))});saveSession();render(true)},
   finish:()=>finishSession(),
+  side:b=>{const e=S.session.ex[+b.dataset.e];if(e.side===b.dataset.s)return;e.side=b.dataset.s;saveSession();render(true)},
   reload:()=>location.reload(),
   gkeySave:()=>{const v=(($('#gkey')||{}).value||'').trim();if(v.length<20){toast('金鑰看起來不完整');return}setGeminiKey(v);S.sample=aiCall;render(true);toast('已開啟 AI 教練 ✦')},
   gkeyDel:()=>{setGeminiKey('');S.sample=aiReady()?aiCall:null;render(true);toast('已移除金鑰')},
