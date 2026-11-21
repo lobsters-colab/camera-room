@@ -867,7 +867,10 @@ const ACT={
   exCustom:()=>{const n=$('#custName').value.trim();if(!n){toast('請輸入動作名稱');return}const g=$('#custG').value;
     const cd=g==='體能';S.session.ex.push({name:n,pattern:'',group:g,unit:cd?'分鐘':'次',wu:cd?'kg':(lastUnit(n)||prefU()),side:cd?null:(lastSide(n)||defSide(n)),target:null,sets:Array.from({length:cd?1:3},()=>({w:'',r:'',done:false}))});saveSession();render(true)},
   finish:()=>finishSession(),
-  side:b=>{const e=S.session.ex[+b.dataset.e];if(e.side===b.dataset.s)return;e.side=b.dataset.s;saveSession();render(true)},
+  side:b=>{const e=S.session.ex[+b.dataset.e],ns=b.dataset.s,os=e.side||'both';if(os===ns)return;
+    const f=ns==='both'?2:0.5;// 單邊→雙邊：×2；雙邊→單邊：÷2
+    e.sets.forEach(x=>{if(x.w!==''&&+x.w>0){const nv=Math.round(+x.w*f*100)/100;if(x._kg!=null&&String(x._w)===String(x.w)){x._kg=x._kg*f;x._w=nv}x.w=nv}});
+    e.side=ns;saveSession();render(true)},
   reload:()=>location.reload(),
   gkeySave:()=>{const v=(($('#gkey')||{}).value||'').trim();if(v.length<20){toast('金鑰看起來不完整');return}setGeminiKey(v);S.sample=aiCall;render(true);toast('已開啟 AI 教練 ✦')},
   gkeyDel:()=>{setGeminiKey('');S.sample=aiReady()?aiCall:null;render(true);toast('已移除金鑰')},
