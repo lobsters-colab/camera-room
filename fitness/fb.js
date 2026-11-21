@@ -72,7 +72,7 @@ async function availableModels(key) {
   } catch (e) { if (e && e.code === 'bad_key') throw e; listed = GMODELS; }
   return listed;
 }
-async function geminiCall(prompt) {
+async function geminiCall(prompt, opts = {}) {
   const key = geminiKey(); let pref = ''; try { pref = localStorage.getItem(GMOD) || ''; } catch (e) {}
   const models = await availableModels(key);
   const list = [...new Set([pref, ...models].filter(Boolean))];
@@ -82,7 +82,8 @@ async function geminiCall(prompt) {
     try {
       r = await fetch(`${GBASE}models/${m}:generateContent`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [...(opts.images || []).map(im => ({ inline_data: { mime_type: im.mime, data: im.data } })), { text: prompt }] }],
+          ...(opts.json ? { generationConfig: { responseMimeType: 'application/json' } } : {}) })
       });
     } catch (e) { throw { code: 'network', message: String(e && e.message || e) }; }
     const j = await r.json().catch(() => ({}));
@@ -148,7 +149,9 @@ export async function aiCall(prompt, opts = {}) {
   if (n >= (C.aiDailyLimit || 20)) throw { code: 'rate_limited' };
   try { localStorage.setItem(key, n + 1); } catch (e) {}
   try {
-    const text = model ? (await model.generateContent(prompt)).response.text() : await geminiCall(prompt);
+    const text = model
+      ? (await model.generateContent(opts.images && opts.images.length ? [prompt, ...opts.images.map(im => ({ inlineData: { data: im.data, mimeType: im.mime } }))] : prompt)).response.text()
+      : await geminiCall(prompt, opts);
     if (opts.onText) opts.onText({ text, delta: text });
     return { text };
   } catch (e) {
