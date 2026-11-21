@@ -178,6 +178,67 @@ function aiKeyCard(){
   <div class="tiny muted" style="margin-top:8px">免費版有每分鐘、每天的次數上限，送出的內容可能會被 Google 用來改進服務。</div></div>`;
 }
 
+
+/* ---------- 進步曲線 ---------- */
+const PM={e1rm:'估計 1RM',top:'最大重量',vol:'總量',reps:'最多次數',time:'最佳時間'};
+function progMetrics(name){
+  const h=exHistory(name);const u=h.length?unitOf(h[h.length-1].e):'次';
+  if(u==='秒'||u==='分鐘')return ['time'];
+  const weighted=h.some(x=>x.e.sets.some(s=>s.w>0));
+  return weighted?['e1rm','top','vol']:['reps','vol'];
+}
+function progSeries(name,m){
+  return exHistory(name).map(x=>{const e=x.e,ss=e.sets.filter(s=>+s.r>0);let v=0;
+    if(m==='e1rm')v=e1rm(e);else if(m==='top')v=Math.max(0,...ss.map(s=>+s.w||0));
+    else if(m==='vol')v=ss.reduce((a,s)=>a+((+s.w||0)>0?(+s.w)*(+s.r):(+s.r)),0);
+    else v=Math.max(0,...ss.map(s=>+s.r||0));
+    return {d:x.date,v}}).filter(p=>p.v>0);
+}
+function progFmt(m,v,name){
+  const weighted=m==='e1rm'||m==='top'||(m==='vol'&&exHistory(name).some(x=>x.e.sets.some(s=>s.w>0)));
+  if(m==='time'){const u=unitOf(exHistory(name).slice(-1)[0].e);return Math.round(v)+(u==='分鐘'?' 分':' 秒')}
+  if(m==='reps'||(m==='vol'&&!weighted))return Math.round(v)+' 下';
+  const pu=prefU(),x=fromKg(v,pu);return (m==='vol'?Math.round(x).toLocaleString():Math.round(x*10)/10)+' '+pu;
+}
+function vProgress(){
+  const cnt={};S.workouts.forEach(w=>w.ex.forEach(e=>{if(e.sets.some(s=>+s.r>0))cnt[e.name]=(cnt[e.name]||0)+1}));
+  const wt={};S.workouts.forEach(w=>w.ex.forEach(e=>{if(e.sets.some(s=>s.w>0&&unitOf(e)==='次'))wt[e.name]=1}));
+  const names=Object.keys(cnt).sort((a,b)=>(wt[b]||0)-(wt[a]||0)||cnt[b]-cnt[a]||a.localeCompare(b));
+  if(!names.length)return '';
+  S.prog=S.prog||{};if(!names.includes(S.prog.ex))S.prog.ex=names[0];
+  const ex=S.prog.ex,ms=progMetrics(ex);if(!ms.includes(S.prog.m))S.prog.m=ms[0];const m=S.prog.m;
+  const pts=progSeries(ex,m);
+  let h=`<div class="card" id="progCard"><h2>📈 進步曲線</h2>
+  <select class="tx" id="progSel">${names.map(n=>`<option value="${esc(n)}" ${n===ex?'selected':''}>${esc(n)}（${cnt[n]} 次）</option>`).join('')}</select>
+  <div class="chips">${ms.map(k=>`<button class="chipbtn" data-act="progM" data-m="${k}" style="${k===m?'background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700':''}">${PM[k]}</button>`).join('')}</div>`;
+  if(pts.length<2){h+=`<div class="empty small" style="padding:18px 6px">${pts.length?`目前只有 1 次紀錄（${progFmt(m,pts[0].v,ex)}），再練一次就能看到曲線。`:'這個動作還沒有可以畫圖的紀錄。'}</div></div>`;return h}
+  const first=pts[0].v,last=pts[pts.length-1].v,best=Math.max(...pts.map(p=>p.v)),diff=last-first,pct=first?diff/first*100:0;
+  const up=diff>0,flat=Math.abs(pct)<0.5;
+  h+=`<div class="row between" style="margin:2px 0 6px;align-items:flex-end"><div><div class="tiny muted">${fmtD(pts[0].d)} → ${fmtD(pts[pts.length-1].d)}</div><b style="font-size:22px;color:${flat?'var(--mute)':up?'var(--ok)':'var(--warn)'}">${flat?'持平':(up?'▲ ':'▼ ')+progFmt(m,Math.abs(diff),ex)}</b>${flat?'':`<span class="small" style="color:${up?'var(--ok)':'var(--warn)'}"> （${up?'+':'−'}${Math.abs(pct).toFixed(1)}%）</span>`}</div>
+  <div style="text-align:right" class="small"><div class="muted tiny">最佳</div><b>${progFmt(m,best,ex)}</b></div></div>`;
+  h+=lineChart(pts,v=>progFmt(m,v,ex));
+  h+=`<div class="row between tiny muted" style="margin-top:6px"><span>第一次 ${progFmt(m,first,ex)}</span><span>最近 ${progFmt(m,last,ex)}</span><span>共 ${pts.length} 次</span></div>
+  ${m==='e1rm'?'<div class="tiny muted" style="margin-top:4px">估計 1RM＝用重量和次數推算你最多能舉一下的重量，最能看出力量有沒有進步。</div>':''}</div>`;
+  return h;
+}
+function lineChart(pts,fmt){
+  const W=340,H=180,pl=10,pr=14,pt=22,pb=24;
+  const t0=parseD(pts[0].d).getTime(),t1=parseD(pts[pts.length-1].d).getTime(),span=Math.max(1,t1-t0);
+  let lo=Math.min(...pts.map(p=>p.v)),hi=Math.max(...pts.map(p=>p.v));const padv=(hi-lo)*0.15||hi*0.1||1;lo=Math.max(0,lo-padv);hi=hi+padv;
+  const X=p=>pl+(W-pl-pr)*((parseD(p.d).getTime()-t0)/span),Y=v=>pt+(H-pt-pb)*(1-(v-lo)/(hi-lo));
+  const line=pts.map(p=>X(p).toFixed(1)+','+Y(p.v).toFixed(1)).join(' ');
+  const area=`${X(pts[0]).toFixed(1)},${H-pb} ${line} ${X(pts[pts.length-1]).toFixed(1)},${H-pb}`;
+  const grid=[0,0.5,1].map(f=>{const v=lo+(hi-lo)*f,y=Y(v);return `<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-dasharray="${f?'3 4':''}"/>`}).join('');
+  const bi=pts.reduce((b,p,i)=>p.v>pts[b].v?i:b,0),li=pts.length-1;
+  const lab=(i,above)=>{const p=pts[i],x=Math.min(W-pr-4,Math.max(pl+4,X(p)));const anc=X(p)>W-60?'end':X(p)<60?'start':'middle';return `<text x="${anc==='end'?x-7:anc==='start'?x+7:x}" y="${Y(p.v)+(above?-10:16)}" text-anchor="${anc}" font-size="11" font-weight="700" fill="var(--ink)">${esc(fmt(p.v))}</text>`};
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="進步曲線">
+  <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acc)" stop-opacity=".22"/><stop offset="1" stop-color="var(--acc)" stop-opacity="0"/></linearGradient></defs>
+  ${grid}<polygon points="${area}" fill="url(#pg)"/><polyline points="${line}" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  ${pts.map((p,i)=>`<circle cx="${X(p).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${i===li||i===bi?4.5:3}" fill="${i===li?'var(--acc)':'var(--card)'}" stroke="var(--acc)" stroke-width="2"><title>${fmtD(p.d)}：${esc(fmt(p.v))}</title></circle>`).join('')}
+  ${lab(li,true)}${bi!==li?lab(bi,true):''}
+  <text x="${pl}" y="${H-6}" font-size="10.5" fill="var(--mute)">${fmtD(pts[0].d)}</text><text x="${W-pr}" y="${H-6}" text-anchor="end" font-size="10.5" fill="var(--mute)">${fmtD(pts[li].d)}</text></svg>`;
+}
+
 /* ---------- login ---------- */
 const AUTHERR={'auth/invalid-email':'Email 格式不正確。','auth/invalid-credential':'Email 或密碼不正確。','auth/wrong-password':'Email 或密碼不正確。','auth/user-not-found':'找不到這個帳號，要不要先註冊？','auth/email-already-in-use':'這個 Email 已經註冊過了，請直接登入。','auth/weak-password':'密碼至少要 6 個字元。','auth/missing-password':'請輸入密碼。','auth/too-many-requests':'嘗試太多次了，請稍後再試。','auth/popup-closed-by-user':'登入視窗被關閉了，請再試一次。','auth/cancelled-popup-request':'','auth/network-request-failed':'網路連線有問題，請確認後再試。','auth/unauthorized-domain':'這個網址還沒加入 Firebase 授權網域（見部署說明）。','auth/operation-not-allowed':'這種登入方式還沒在 Firebase 開啟（見部署說明）。'};
 const authMsg=e=>AUTHERR[e&&e.code]??('登入失敗：'+((e&&e.code)||'請再試一次'));
@@ -732,10 +793,11 @@ function vLog(){
   h+=list.length?list.map(wCard).join(''):`<div class="card empty">${S.calSel?'這天沒有訓練紀錄':'這個月還沒有訓練'}${S.calSel===td||(!S.calSel&&isCur)?`<br><br><button class="btn acc" data-act="pick">開始訓練</button>`:''}</div>`;
   if(S.workouts.length){
     const wb=weekBuckets(8);
+    h+=vProgress();
     h+=`<div class="card"><h2>每週訓練總量</h2>${barChart(wb)}<div class="tiny muted">總量 = 重量 × 次數 的加總；柱上數字為該週訓練次數</div></div>`;
     const names=[...new Set(S.workouts.flatMap(w=>w.ex.map(e=>e.name)))];
     const prs=names.map(n=>{let best=0,bs=null,bd='',bu='kg';S.workouts.forEach(w=>w.ex.filter(e=>e.name===n).forEach(e=>{e.sets.forEach(s=>{if(unitOf(e)!=='次'||!(s.w>0))return;const v=s.w*(1+Math.min(s.r,12)/30);if(v>best){best=v;bs=s;bd=w.date;bu=e.wu||'kg'}})}));return {n,best,bs,bd,u:bu}}).filter(x=>x.best>0).sort((a,b)=>b.best-a.best).slice(0,8);
-    if(prs.length)h+=`<div class="card"><h2>個人最佳</h2>${prs.map(x=>`<div class="pr"><span>${esc(x.n)}<br><span class="tiny muted">${fmtW(x.bs.w,x.u)} × ${x.bs.r} · ${fmtD(x.bd)}</span></span><span style="text-align:right"><b>${Math.round(fromKg(x.best,prefU()))}</b> ${prefU()}<br><span class="tiny muted">估計 1RM</span></span></div>`).join('')}</div>`;
+    if(prs.length)h+=`<div class="card"><h2>個人最佳</h2><div class="tiny muted" style="margin:-6px 0 4px">點一下看這個動作的進步曲線</div>${prs.map(x=>`<div class="pr" data-act="progPick" data-n="${esc(x.n)}" style="cursor:pointer"><span>${esc(x.n)}<br><span class="tiny muted">${fmtW(x.bs.w,x.u)} × ${x.bs.r} · ${fmtD(x.bd)}</span></span><span style="text-align:right"><b>${Math.round(fromKg(x.best,prefU()))}</b> ${prefU()}<br><span class="tiny muted">估計 1RM</span></span></div>`).join('')}</div>`;
   }
   h+=bwCard();
   return h;
@@ -861,6 +923,8 @@ const ACT={
   exCustom:()=>{const n=$('#custName').value.trim();if(!n){toast('請輸入動作名稱');return}const g=$('#custG').value;
     const cd=g==='體能';S.session.ex.push({name:n,pattern:'',group:g,unit:cd?'分鐘':'次',wu:cd?'kg':(lastUnit(n)||prefU()),target:null,sets:Array.from({length:cd?1:3},()=>({w:'',r:'',done:false}))});saveSession();render(true)},
   finish:()=>finishSession(),
+  progM:b=>{S.prog={...(S.prog||{}),m:b.dataset.m};render(true)},
+  progPick:b=>{S.prog={ex:b.dataset.n};render(true);const c=document.getElementById('progCard');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},
   reload:()=>location.reload(),
   gkeySave:()=>{const v=(($('#gkey')||{}).value||'').trim();if(v.length<20){toast('金鑰看起來不完整');return}setGeminiKey(v);S.sample=aiCall;render(true);toast('已開啟 AI 教練 ✦')},
   gkeyDel:()=>{setGeminiKey('');S.sample=aiReady()?aiCall:null;render(true);toast('已移除金鑰')},
@@ -906,6 +970,7 @@ const ACT={
 function confirmOverwrite(){toast('你有進行中的訓練，先完成或放棄它');S.tab='today';render(true);return false}
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act]');if(!b)return;const f=ACT[b.dataset.act];if(f){if(b.tagName==='BUTTON')ev.preventDefault();f(b,ev)}});
 document.addEventListener('input',ev=>{const t=ev.target;if(t.dataset&&t.dataset.in&&S.session){const x=S.session.ex[+t.dataset.e].sets[+t.dataset.s];x[t.dataset.in]=t.value;saveSession()}
+  if(t.id==='progSel'){S.prog={...(S.prog||{}),ex:t.value};render(true);return}
   if(t.id==='aiq')S.ai.q=t.value;if(t.id==='goalText')S.goalDraft=t.value});
 document.addEventListener('submit',ev=>{
   ev.preventDefault();const f=ev.target;
