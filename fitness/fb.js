@@ -87,8 +87,8 @@ async function geminiCall(prompt, opts = {}) {
   const key = geminiKey(); let pref = ''; try { pref = localStorage.getItem(GMOD) || ''; } catch (e) {}
   const models = await availableModels(key);
   const all = [...new Set([pref, ...models].filter(Boolean))];
-  // 先試還有額度的模型；全部都被擋時，還是每個都試一次（額度可能已經恢復）
-  const list = all.filter(m => !qBlocked(m)).concat(all.filter(qBlocked));
+  // 跳過免費版不能用的模型（只在找可用模型時才會換）
+  const okList = all.filter(m => !qBlocked(m)), list = okList.length ? okList : all;
   let lastErr = '', quotaHits = 0, switched = false;
   for (const m of list) {
     let r;
@@ -102,7 +102,7 @@ async function geminiCall(prompt, opts = {}) {
     const j = await r.json().catch(() => ({}));
     const msg = (j.error && j.error.message) || '';
     if (r.status === 404 || (/model/i.test(msg) && /(not found|not supported|deprecated|no longer)/i.test(msg))) { lastErr = m + '：' + (msg || '404'); if (m === pref) try { localStorage.removeItem(GMOD); } catch (e) {} switched = true; continue; }
-    if (r.status === 429) { qMark(m, msg); quotaHits++; switched = true; lastErr = m + '：額度用完'; continue; }  // 換下一個模型
+    if (r.status === 429) throw { code: 'quota', message: msg };  // 額度用完就直接停，不自動換模型
     if (r.status === 400 || r.status === 401 || r.status === 403) {
       if (/api key|API_KEY/i.test(msg)) throw { code: 'bad_key', message: msg };
       if (/free tier|not available|permission/i.test(msg)) { const q = qGet(); q[m] = Date.now() + 24 * 3600e3; try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) {} }
@@ -115,7 +115,6 @@ async function geminiCall(prompt, opts = {}) {
     if (!text) throw { code: 'unavailable', message: 'AI 沒有回覆內容' + (c && c.finishReason ? '（' + c.finishReason + '）' : '') };
     return { text, model: m, fallback: switched };
   }
-  if (quotaHits) throw { code: 'quota', message: '所有免費模型的額度都暫時用完了' };
   throw { code: 'unavailable', message: lastErr || '找不到可用的模型' };
 }
 export const aiReady = () => !!model || !!geminiKey();
@@ -164,7 +163,7 @@ export async function aiCall(prompt, opts = {}) {
   const uid = auth && auth.currentUser ? auth.currentUser.uid : 'local';
   const key = 'ai-' + uid + '-' + new Date().toLocaleDateString('sv');
   let n = 0; try { n = +localStorage.getItem(key) || 0; } catch (e) {}
-  if (n >= (C.aiDailyLimit || 40)) throw { code: 'rate_limited' };
+  if (n >= (C.aiDailyLimit || 20)) throw { code: 'rate_limited' };
   try { localStorage.setItem(key, n + 1); } catch (e) {}
   try {
     let text, used = '';

@@ -357,7 +357,7 @@ async function foodGo(){
     S.food={...F,pending:null,note:'',busy:false,open:id,type:mealTypeNow()};toast('已記錄這一餐 🍱');
   }catch(e){
     F.busy=false;
-    F.err=e&&e.code==='rate_limited'?'今天的 AI 使用次數已經用完，可以先用手動輸入。':e&&e.code==='quota'?'所有免費模型的額度都暫時用完了，等一分鐘再試，或先用手動輸入。':e&&e.code==='bad_key'?'Gemini 金鑰無效，請到「我的」重新貼上。':e&&e.code==='parse'?'AI 回覆的格式看不懂，請再試一次。':'AI 暫時無法評估，請稍後再試。'+(e&&e.message?'（'+String(e.message).slice(0,100)+'）':'');
+    F.err=e&&e.code==='rate_limited'?'今天的 AI 使用次數已經用完，可以先用手動輸入。':e&&e.code==='quota'?'免費 AI 額度暫時用完了，等一分鐘再試，或先用手動輸入。':e&&e.code==='bad_key'?'Gemini 金鑰無效，請到「我的」重新貼上。':e&&e.code==='parse'?'AI 回覆的格式看不懂，請再試一次。':'AI 暫時無法評估，請稍後再試。'+(e&&e.message?'（'+String(e.message).slice(0,100)+'）':'');
   }
   render(true);hydratePhotos();
 }
@@ -1002,7 +1002,7 @@ async function askAI(q){
     else if(e&&e.code==='not_granted'){S.sample=null}
     else if(e&&e.code==='rate_limited')S.ai.err='今天的 AI 使用次數已經用完，明天再來問吧。';
     else if(e&&e.code==='bad_key')S.ai.err='Gemini 金鑰無效或沒有權限，請到「我的」重新貼上。'+(e.message?'（'+e.message.slice(0,80)+'）':'');
-    else if(e&&e.code==='quota')S.ai.err='所有免費模型的額度都暫時用完了。等一分鐘再試；如果是今天的額度用完，台灣時間下午 4 點左右會恢復。';
+    else if(e&&e.code==='quota')S.ai.err='免費 AI 額度暫時用完了。等一分鐘再試；如果是今天的額度用完，台灣時間下午 4 點左右會恢復。';
     else if(e&&e.code==='network')S.ai.err='連不上 Gemini，請確認網路後再試。';
     else if(!(aiCtl&&aiCtl.signal.aborted))S.ai.err='教練暫時無法回答，請稍後再試。'+(e&&e.message?'（'+String(e.message).slice(0,120)+'）':'');
   }
