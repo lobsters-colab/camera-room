@@ -94,11 +94,11 @@ async function geminiCall(prompt, opts = {}) {
   // 跳過免費版不能用的模型（只在找可用模型時才會換）
   const okList = all.filter(m => !qBlocked(m)), list = okList.length ? okList : all;
   let lastErr = '', quotaHits = 0, switched = false;
-  // 思考設為「中」：2.x 用 thinkingBudget，3.x 以後與 latest 別名用 thinkingLevel
-  const thinkCfg = m => /gemini-2\./.test(m) ? { thinkingBudget: 2048 } : { thinkingLevel: 'medium' };  // 中等思考：品質和速度的平衡
+  // 思考設為「低」：2.x 用 thinkingBudget，3.x 以後與 latest 別名用 thinkingLevel
+  const thinkCfg = m => /gemini-2\./.test(m) ? { thinkingBudget: 512 } : { thinkingLevel: 'low' };  // 低思考：回答快，又不會太隨便
   const stream = !!opts.onText && !opts.json;
   for (const m of list) {
-    const NT = 'ft-nothink2'; let ntSet = []; try { ntSet = JSON.parse(localStorage.getItem(NT) || '[]'); } catch (e) {}
+    const NT = 'ft-nothink3'; let ntSet = []; try { ntSet = JSON.parse(localStorage.getItem(NT) || '[]'); } catch (e) {}
     let r, j = {}, msg = '', noThink = ntSet.includes(m);
     for (let attempt = 0; attempt < 2; attempt++) {
       const gc = { ...(opts.json ? { responseMimeType: 'application/json' } : {}), ...(noThink ? {} : { thinkingConfig: thinkCfg(m) }) };
