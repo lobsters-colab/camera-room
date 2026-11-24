@@ -12,5 +12,5 @@ window.APP_CONFIG = {
   aiModel: 'gemini-3.5-flash-lite',
 
   // 每人每天可以用 AI 的次數（避免把免費額度用完）
-  aiDailyLimit: 20
+  aiDailyLimit: 40
 };

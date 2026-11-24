@@ -68,15 +68,28 @@ async function availableModels(key) {
     const ver = n => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
     const score = n => (/latest/.test(n) ? 3 : 0) + (/flash/.test(n) ? 2 : 0) + (/lite/.test(n) ? 0.5 : 0) - (/(preview|exp)/.test(n) ? 1.5 : 0) + ver(n) / 10;
     ok.sort((x, y) => score(y) - score(x));
-    listed = ok.length ? ok.slice(0, 6) : GMODELS;
+    listed = ok.length ? ok.slice(0, 10) : GMODELS;
   } catch (e) { if (e && e.code === 'bad_key') throw e; listed = GMODELS; }
   return listed;
 }
+// 額度用完的模型先跳過：每分鐘上限 → 擋 70 秒；每日上限 → 擋到太平洋時間午夜（台灣下午 4 點左右）
+const QKEY = 'ft-gemini-quota';
+const qGet = () => { try { return JSON.parse(localStorage.getItem(QKEY) || '{}'); } catch (e) { return {}; } };
+function qMark(m, msg) {
+  const q = qGet(), now = Date.now();
+  const daily = /per ?day|PerDay|daily|RPD/i.test(msg);
+  let until = now + 70 * 1000;
+  if (daily) { const d = new Date(); d.setUTCHours(8, 0, 0, 0); if (d.getTime() <= now) d.setUTCDate(d.getUTCDate() + 1); until = d.getTime(); }
+  q[m] = until; try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) {}
+}
+const qBlocked = m => (qGet()[m] || 0) > Date.now();
 async function geminiCall(prompt, opts = {}) {
   const key = geminiKey(); let pref = ''; try { pref = localStorage.getItem(GMOD) || ''; } catch (e) {}
   const models = await availableModels(key);
-  const list = [...new Set([pref, ...models].filter(Boolean))];
-  let lastErr = '';
+  const all = [...new Set([pref, ...models].filter(Boolean))];
+  // 先試還有額度的模型；全部都被擋時，還是每個都試一次（額度可能已經恢復）
+  const list = all.filter(m => !qBlocked(m)).concat(all.filter(qBlocked));
+  let lastErr = '', quotaHits = 0, switched = false;
   for (const m of list) {
     let r;
     try {
@@ -88,16 +101,21 @@ async function geminiCall(prompt, opts = {}) {
     } catch (e) { throw { code: 'network', message: String(e && e.message || e) }; }
     const j = await r.json().catch(() => ({}));
     const msg = (j.error && j.error.message) || '';
-    if (r.status === 404 || (/model/i.test(msg) && /(not found|not supported|deprecated|no longer)/i.test(msg))) { lastErr = m + '：' + (msg || '404'); if (m === pref) try { localStorage.removeItem(GMOD); } catch (e) {} continue; }
-    if (r.status === 429) throw { code: 'quota', message: msg };
-    if (r.status === 400 || r.status === 401 || r.status === 403) throw { code: 'bad_key', message: msg };
-    if (!r.ok) { lastErr = m + '：HTTP ' + r.status + ' ' + msg; continue; }
-    try { localStorage.setItem(GMOD, m); } catch (e) {}
+    if (r.status === 404 || (/model/i.test(msg) && /(not found|not supported|deprecated|no longer)/i.test(msg))) { lastErr = m + '：' + (msg || '404'); if (m === pref) try { localStorage.removeItem(GMOD); } catch (e) {} switched = true; continue; }
+    if (r.status === 429) { qMark(m, msg); quotaHits++; switched = true; lastErr = m + '：額度用完'; continue; }  // 換下一個模型
+    if (r.status === 400 || r.status === 401 || r.status === 403) {
+      if (/api key|API_KEY/i.test(msg)) throw { code: 'bad_key', message: msg };
+      if (/free tier|not available|permission/i.test(msg)) { const q = qGet(); q[m] = Date.now() + 24 * 3600e3; try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) {} }
+      lastErr = m + '：' + (msg || 'HTTP ' + r.status); switched = true; continue;                         // 這個模型免費版不能用 → 換下一個
+    }
+    if (!r.ok) { lastErr = m + '：HTTP ' + r.status + ' ' + msg; switched = true; continue; }
+    if (!switched || !pref) { try { localStorage.setItem(GMOD, m); } catch (e) {} }  // 因額度暫時換模型時，不改掉原本的首選
     const c = j.candidates && j.candidates[0];
     const text = ((c && c.content && c.content.parts) || []).map(p => p.text || '').join('');
     if (!text) throw { code: 'unavailable', message: 'AI 沒有回覆內容' + (c && c.finishReason ? '（' + c.finishReason + '）' : '') };
-    return text;
+    return { text, model: m, fallback: switched };
   }
+  if (quotaHits) throw { code: 'quota', message: '所有免費模型的額度都暫時用完了' };
   throw { code: 'unavailable', message: lastErr || '找不到可用的模型' };
 }
 export const aiReady = () => !!model || !!geminiKey();
@@ -146,14 +164,14 @@ export async function aiCall(prompt, opts = {}) {
   const uid = auth && auth.currentUser ? auth.currentUser.uid : 'local';
   const key = 'ai-' + uid + '-' + new Date().toLocaleDateString('sv');
   let n = 0; try { n = +localStorage.getItem(key) || 0; } catch (e) {}
-  if (n >= (C.aiDailyLimit || 20)) throw { code: 'rate_limited' };
+  if (n >= (C.aiDailyLimit || 40)) throw { code: 'rate_limited' };
   try { localStorage.setItem(key, n + 1); } catch (e) {}
   try {
-    const text = model
-      ? (await model.generateContent(opts.images && opts.images.length ? [prompt, ...opts.images.map(im => ({ inlineData: { data: im.data, mimeType: im.mime } }))] : prompt)).response.text()
-      : await geminiCall(prompt, opts);
+    let text, used = '';
+    if (model) text = (await model.generateContent(opts.images && opts.images.length ? [prompt, ...opts.images.map(im => ({ inlineData: { data: im.data, mimeType: im.mime } }))] : prompt)).response.text();
+    else { const g = await geminiCall(prompt, opts); text = g.text; used = g.model; }
     if (opts.onText) opts.onText({ text, delta: text });
-    return { text };
+    return { text, model: used };
   } catch (e) {
     if (e && ['quota', 'bad_key', 'network', 'unavailable'].includes(e.code) && !model) throw e;
     if (e && (e.code === 'quota' || e.code === 'bad_key')) throw e;
