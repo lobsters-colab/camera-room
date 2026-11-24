@@ -976,6 +976,7 @@ async function askAI(q){
   q=(q||'').trim();if(!q){toast('請輸入問題');return}
   if(!S.sample){toast('無法使用 AI 教練');return}
   S.ai={text:'',busy:true,err:'',q,model:''};render(true);
+  {const o=$('#aiout');if(o)o.innerHTML='<div class="ai-out muted small">🤔 教練正在想…</div>'}
   const p=S.profile,P=plan();
   const recent=S.workouts.filter(w=>daysAgo(w.date)<28).slice().reverse();
   const ctx=[

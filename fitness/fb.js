@@ -45,14 +45,14 @@ export async function initFirebase() {
 }
 
 // 個人用：使用者自己的 Gemini API 金鑰（只存在這支手機）
-const GKEY = 'ft-gemini-key', GMOD = 'ft-gemini-model2';  // model2：改成優先用最快的模型後重新挑選
-const GMODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+const GKEY = 'ft-gemini-key', GMOD = 'ft-gemini-model3';  // model3：改成優先用 Flash 後重新挑選
+const GMODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 export const geminiKey = () => { try { return localStorage.getItem(GKEY) || ''; } catch (e) { return ''; } };
 export function setGeminiKey(k) { try { k ? localStorage.setItem(GKEY, k.trim()) : (localStorage.removeItem(GKEY), localStorage.removeItem(GMOD)); } catch (e) {} }
 const GBASE = 'https://generativelanguage.googleapis.com/v1beta/';
 let listed = null;
 // 向 Google 查詢這把金鑰可以用的模型，挑適合聊天的 flash 系列
-const MLIST = 'ft-gemini-models';
+const MLIST = 'ft-gemini-models3';
 async function availableModels(key) {
   if (listed) return listed;
   try { const c = JSON.parse(localStorage.getItem(MLIST) || 'null'); if (c && c.k === key.slice(-6) && Date.now() - c.t < 24 * 3600e3 && c.list.length) return (listed = c.list); } catch (e) {}
@@ -68,8 +68,8 @@ async function availableModels(key) {
       .map(m => m.name.replace(/^models\//, ''))
       .filter(n => /^gemini/.test(n) && !/(image|tts|audio|live|embed|vision|robotics|computer|native|thinking)/i.test(n));
     const ver = n => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
-    // 速度優先：Flash-Lite > Flash > 其他；Pro 最慢排最後
-    const score = n => (/lite/.test(n) ? 4 : 0) + (/flash/.test(n) ? 3 : 0) + (/latest/.test(n) ? 1 : 0) - (/pro/.test(n) ? 4 : 0) - (/(preview|exp)/.test(n) ? 1.5 : 0) + ver(n) / 10;
+    // Flash 優先（夠聰明也夠快），其次 Flash-Lite；Pro 最慢排最後
+    const score = n => (/lite/.test(n) ? -1 : 0) + (/flash/.test(n) ? 4 : 0) + (/latest/.test(n) ? 1 : 0) - (/pro/.test(n) ? 4 : 0) - (/(preview|exp)/.test(n) ? 1.5 : 0) + ver(n) / 10;
     ok.sort((x, y) => score(y) - score(x));
     listed = ok.length ? ok.slice(0, 10) : GMODELS;
     try { localStorage.setItem(MLIST, JSON.stringify({ k: key.slice(-6), t: Date.now(), list: listed })); } catch (e) {}
@@ -94,11 +94,11 @@ async function geminiCall(prompt, opts = {}) {
   // 跳過免費版不能用的模型（只在找可用模型時才會換）
   const okList = all.filter(m => !qBlocked(m)), list = okList.length ? okList : all;
   let lastErr = '', quotaHits = 0, switched = false;
-  // 把「思考」降到最低：2.x 用 thinkingBudget，3.x 以後與 latest 別名用 thinkingLevel
-  const thinkCfg = m => /gemini-2\./.test(m) ? { thinkingBudget: /pro/.test(m) ? 128 : 0 } : { thinkingLevel: /pro/.test(m) ? 'low' : 'minimal' };
+  // 思考設為「中」：2.x 用 thinkingBudget，3.x 以後與 latest 別名用 thinkingLevel
+  const thinkCfg = m => /gemini-2\./.test(m) ? { thinkingBudget: 2048 } : { thinkingLevel: 'medium' };  // 中等思考：品質和速度的平衡
   const stream = !!opts.onText && !opts.json;
   for (const m of list) {
-    const NT = 'ft-nothink'; let ntSet = []; try { ntSet = JSON.parse(localStorage.getItem(NT) || '[]'); } catch (e) {}
+    const NT = 'ft-nothink2'; let ntSet = []; try { ntSet = JSON.parse(localStorage.getItem(NT) || '[]'); } catch (e) {}
     let r, j = {}, msg = '', noThink = ntSet.includes(m);
     for (let attempt = 0; attempt < 2; attempt++) {
       const gc = { ...(opts.json ? { responseMimeType: 'application/json' } : {}), ...(noThink ? {} : { thinkingConfig: thinkCfg(m) }) };
