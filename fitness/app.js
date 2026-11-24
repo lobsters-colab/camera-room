@@ -1,4 +1,4 @@
-import {initFirebase,onUser,loginGoogle,emailSignIn,emailSignUp,resetPassword,logout,userCol,aiCall,aiReady,geminiKey,setGeminiKey} from './fb.js';
+import {initFirebase,onUser,loginGoogle,emailSignIn,emailSignUp,resetPassword,logout,userCol,aiCall,aiReady,geminiKey,setGeminiKey,diagGemini} from './fb.js';
 
 /* ---------- utils ---------- */
 const $=s=>document.querySelector(s);
@@ -172,7 +172,8 @@ function localMode(){
 
 function aiKeyCard(){
   const k=geminiKey();
-  return `<div class="card"><h2>✦ AI 教練（選用・免費）</h2>${k?`<div class="small">已設定 Gemini 金鑰（${esc(k.slice(0,6))}…${esc(k.slice(-4))}），AI 教練和 AI 目標規劃都能用。</div><div class="spacer"></div><button class="btn sm ghost danger" data-act="gkeyDel">移除金鑰</button>`
+  return `<div class="card"><h2>✦ AI 教練（選用・免費）</h2>${k?`<div class="small">已設定 Gemini 金鑰（${esc(k.slice(0,6))}…${esc(k.slice(-4))}），AI 教練和 AI 目標規劃都能用。</div><div class="spacer"></div><div class="row wrap"><button class="btn sm" data-act="gdiag" ${S.diag&&S.diag.busy?'disabled':''}>🔍 ${S.diag&&S.diag.busy?'檢查中…':'檢查連線'}</button><button class="btn sm ghost danger" data-act="gkeyDel">移除金鑰</button></div>
+  ${S.diag&&S.diag.steps.length?`<div style="margin-top:10px">${S.diag.steps.map(x=>`<div class="small" style="padding:5px 0;border-top:1px solid var(--line)">${x.s==='ok'?'✅':x.s==='warn'?'⚠️':'❌'} <b>${esc(x.label)}</b><div class="tiny muted">${esc(x.detail)}</div></div>`).join('')}</div>`:''}`
   :`<div class="small muted">到 Google AI Studio 免費申請 Gemini API 金鑰，貼在這裡就能用 AI 教練和 AI 目標規劃。金鑰只存在這支手機。</div>
   <div style="margin:8px 0"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">申請免費金鑰 →</a></div>
   <div class="row"><input class="tx" id="gkey" type="password" autocomplete="off" placeholder="貼上 API 金鑰（AIza 開頭）"><button class="btn sm acc" data-act="gkeySave">儲存</button></div>`}
@@ -357,7 +358,7 @@ async function foodGo(){
     S.food={...F,pending:null,note:'',busy:false,open:id,type:mealTypeNow()};toast('已記錄這一餐 🍱');
   }catch(e){
     F.busy=false;
-    F.err=e&&e.code==='rate_limited'?'今天的 AI 使用次數已經用完，可以先用手動輸入。':e&&e.code==='quota'?'免費 AI 額度暫時用完了，等一分鐘再試，或先用手動輸入。':e&&e.code==='bad_key'?'Gemini 金鑰無效，請到「我的」重新貼上。':e&&e.code==='parse'?'AI 回覆的格式看不懂，請再試一次。':'AI 暫時無法評估，請稍後再試。'+(e&&e.message?'（'+String(e.message).slice(0,100)+'）':'');
+    F.err=e&&e.code==='rate_limited'?'今天的 AI 使用次數已經用完，可以先用手動輸入。':e&&e.code==='quota'?'免費 AI 額度暫時用完了，等一分鐘再試，或先用手動輸入。':e&&e.code==='bad_key'?'Gemini 金鑰無效，請到「我的」重新貼上。':e&&e.code==='network'?'連不上 Gemini（'+(e.message||'連線失敗')+'）。到「我的」按「檢查連線」可以看原因。':e&&e.code==='parse'?'AI 回覆的格式看不懂，請再試一次。':'AI 暫時無法評估，請稍後再試。'+(e&&e.message?'（'+String(e.message).slice(0,100)+'）':'');
   }
   render(true);hydratePhotos();
 }
@@ -1004,7 +1005,7 @@ async function askAI(q){
     else if(e&&e.code==='rate_limited')S.ai.err='今天的 AI 使用次數已經用完，明天再來問吧。';
     else if(e&&e.code==='bad_key')S.ai.err='Gemini 金鑰無效或沒有權限，請到「我的」重新貼上。'+(e.message?'（'+e.message.slice(0,80)+'）':'');
     else if(e&&e.code==='quota')S.ai.err='免費 AI 額度暫時用完了。等一分鐘再試；如果是今天的額度用完，台灣時間下午 4 點左右會恢復。';
-    else if(e&&e.code==='network')S.ai.err='連不上 Gemini，請確認網路後再試。';
+    else if(e&&e.code==='network')S.ai.err='連不上 Gemini（'+(e.message||'連線失敗')+'）。可以到「我的」按「檢查連線」看是哪一步出問題。';
     else if(!(aiCtl&&aiCtl.signal.aborted))S.ai.err='教練暫時無法回答，請稍後再試。'+(e&&e.message?'（'+String(e.message).slice(0,120)+'）':'');
   }
   S.ai.busy=false;if(S.tab==='coach')render(true);
@@ -1063,6 +1064,9 @@ const ACT={
   progPick:b=>{S.prog={ex:b.dataset.n};render(true);const c=document.getElementById('progCard');if(c)c.scrollIntoView({behavior:'smooth',block:'start'})},
   reload:()=>location.reload(),
   gkeySave:()=>{const v=(($('#gkey')||{}).value||'').trim();if(v.length<20){toast('金鑰看起來不完整');return}setGeminiKey(v);S.sample=aiCall;render(true);toast('已開啟 AI 教練 ✦')},
+  gdiag:async()=>{S.diag={busy:true,steps:[]};render(true);
+    await diagGemini((label,s,detail)=>{S.diag.steps.push({label,s,detail});if(S.tab==='me')render(true)});
+    S.diag.busy=false;if(S.tab==='me')render(true)},
   gkeyDel:()=>{setGeminiKey('');S.sample=aiReady()?aiCall:null;render(true);toast('已移除金鑰')},
   importOpen:()=>{S.importOpen=!S.importOpen;render(true)},
   importGo:async()=>{const j=parseJSON(($('#importText')||{}).value||'');

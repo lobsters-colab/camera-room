@@ -48,7 +48,10 @@ export async function initFirebase() {
 const GKEY = 'ft-gemini-key', GMOD = 'ft-gemini-model3';  // model3：改成優先用 Flash 後重新挑選
 const GMODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 export const geminiKey = () => { try { return localStorage.getItem(GKEY) || ''; } catch (e) { return ''; } };
-export function setGeminiKey(k) { try { k ? localStorage.setItem(GKEY, k.trim()) : (localStorage.removeItem(GKEY), localStorage.removeItem(GMOD)); } catch (e) {} }
+// 貼上時常夾帶看不見的空白、換行或全形字元，會讓連線直接失敗 → 只保留金鑰會用到的字元
+export const cleanKey = k => String(k || '').replace(/[^0-9A-Za-z_\-]/g, '');
+try { const rawK = localStorage.getItem('ft-gemini-key'); if (rawK && rawK !== cleanKey(rawK)) localStorage.setItem('ft-gemini-key', cleanKey(rawK)); } catch (e) {}  // 修正之前存進去的髒金鑰
+export function setGeminiKey(k) { try { k ? localStorage.setItem(GKEY, cleanKey(k)) : (localStorage.removeItem(GKEY), localStorage.removeItem(GMOD)); } catch (e) {} }
 const GBASE = 'https://generativelanguage.googleapis.com/v1beta/';
 let listed = null;
 // 向 Google 查詢這把金鑰可以用的模型，挑適合聊天的 flash 系列
@@ -87,8 +90,15 @@ function qMark(m, msg) {
   q[m] = until; try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) {}
 }
 const qBlocked = m => (qGet()[m] || 0) > Date.now();
+function netMsg(e) {
+  const raw = String(e && e.message || e || '');
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return '手機目前沒有網路';
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return 'App 切到背景，連線被系統中斷';
+  if (/header|ISO-8859|invalid/i.test(raw)) return '金鑰裡有不正確的字元，請重新複製貼上（' + raw + '）';
+  return raw || '連線失敗';
+}
 async function geminiCall(prompt, opts = {}) {
-  const key = geminiKey(); let pref = ''; try { pref = localStorage.getItem(GMOD) || ''; } catch (e) {}
+  const key = cleanKey(geminiKey()); let pref = ''; try { pref = localStorage.getItem(GMOD) || ''; } catch (e) {}
   const models = await availableModels(key);
   const all = [...new Set([pref, ...models].filter(Boolean))];
   // 跳過免費版不能用的模型（只在找可用模型時才會換）
@@ -99,15 +109,27 @@ async function geminiCall(prompt, opts = {}) {
   const stream = !!opts.onText && !opts.json;
   for (const m of list) {
     const NT = 'ft-nothink3'; let ntSet = []; try { ntSet = JSON.parse(localStorage.getItem(NT) || '[]'); } catch (e) {}
-    let r, j = {}, msg = '', noThink = ntSet.includes(m);
+    let r, j = {}, msg = '', noThink = ntSet.includes(m), useStream = stream;
+    const send = s => fetch(`${GBASE}models/${m}:${s ? 'streamGenerateContent?alt=sse' : 'generateContent'}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, signal: opts.signal,
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [...(opts.images || []).map(im => ({ inline_data: { mime_type: im.mime, data: im.data } })), { text: prompt }] }],
+        generationConfig: { ...(opts.json ? { responseMimeType: 'application/json' } : {}), ...(noThink ? {} : { thinkingConfig: thinkCfg(m) }) } })
+    });
+    // 連線失敗時自動重試：串流 → 改一般模式 → 等 1.5 秒再試一次
+    const sendRetry = async () => {
+      let lastNet;
+      for (let k = 0; k < 3; k++) {
+        try { return await send(useStream); }
+        catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          lastNet = e;
+          if (useStream) useStream = false; else await new Promise(res => setTimeout(res, 1500));
+        }
+      }
+      throw { code: 'network', message: netMsg(lastNet) };
+    };
     for (let attempt = 0; attempt < 2; attempt++) {
-      const gc = { ...(opts.json ? { responseMimeType: 'application/json' } : {}), ...(noThink ? {} : { thinkingConfig: thinkCfg(m) }) };
-      try {
-        r = await fetch(`${GBASE}models/${m}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, signal: opts.signal,
-          body: JSON.stringify({ contents: [{ role: 'user', parts: [...(opts.images || []).map(im => ({ inline_data: { mime_type: im.mime, data: im.data } })), { text: prompt }] }], generationConfig: gc })
-        });
-      } catch (e) { if (e && e.name === 'AbortError') throw e; throw { code: 'network', message: String(e && e.message || e) }; }
+      r = await sendRetry();
       if (r.ok) break;
       j = await r.json().catch(() => ({})); msg = (j.error && j.error.message) || '';
       if (r.status === 400 && !noThink && /think/i.test(msg)) { noThink = true; try { localStorage.setItem(NT, JSON.stringify([...ntSet, m])); } catch (e) {} continue; }  // 這個模型不支援調整思考 → 不帶設定再試一次
@@ -125,11 +147,22 @@ async function geminiCall(prompt, opts = {}) {
     }
     if (!switched || !pref) { try { localStorage.setItem(GMOD, m); } catch (e) {} }
     let text = '', finish = '';
-    if (stream && r.body && r.body.getReader) {
+    if (useStream && r.body && r.body.getReader) {
       // 邊產生邊顯示
       const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
       for (;;) {
-        const { value, done } = await rd.read(); if (done) break;
+        let chunk;
+        try { chunk = await rd.read(); }
+        catch (e) {  // 串流中途斷線（例如 App 切到背景）
+          if (e && e.name === 'AbortError') throw e;
+          if (text) { text += '\n\n（連線中斷，回答可能不完整）'; break; }
+          useStream = false; r = await sendRetry(); if (!r.ok) throw { code: 'network', message: '串流中斷後重試失敗（HTTP ' + r.status + '）' };
+          j = await r.json().catch(() => ({})); const c0 = j.candidates && j.candidates[0];
+          text = ((c0 && c0.content && c0.content.parts) || []).filter(p => !p.thought).map(p => p.text || '').join('');
+          if (text) opts.onText({ text, delta: text });
+          break;
+        }
+        const { value, done } = chunk; if (done) break;
         buf += dec.decode(value, { stream: true });
         let i; while ((i = buf.indexOf('\n')) >= 0) {
           const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
@@ -146,9 +179,33 @@ async function geminiCall(prompt, opts = {}) {
       text = ((c && c.content && c.content.parts) || []).filter(p => !p.thought).map(p => p.text || '').join('');
     }
     if (!text) throw { code: 'unavailable', message: 'AI 沒有回覆內容' + (finish ? '（' + finish + '）' : '') };
-    return { text, model: m, fallback: switched };
+    return { text, model: m, fallback: switched, streamed: useStream };
   }
   throw { code: 'unavailable', message: lastErr || '找不到可用的模型' };
+}
+// 連線檢查：一步一步測，找出 AI 連不上的原因
+export async function diagGemini(step) {
+  const key = cleanKey(geminiKey()), raw = geminiKey();
+  if (!key) { step('金鑰', 'bad', '還沒有設定金鑰'); return; }
+  step('金鑰格式', /^AIza[0-9A-Za-z_\-]{35}$/.test(key) ? 'ok' : 'warn', (raw !== key ? '已自動清掉多餘字元。' : '') + (/^AIza/.test(key) ? `長度 ${key.length}` : '不是 AIza 開頭，可能貼錯了'));
+  step('網路', navigator.onLine ? 'ok' : 'bad', navigator.onLine ? '手機有連上網路' : '手機目前沒有網路');
+  let t = Date.now(), r;
+  try { r = await fetch(GBASE + 'models?pageSize=200', { headers: { 'x-goog-api-key': key } }); }
+  catch (e) { step('連到 Google', 'bad', '連不到 Google 伺服器：' + netMsg(e) + '。可能是網路擋住了 Google（公司或學校 Wi-Fi），試試改用行動網路。'); return; }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { step('金鑰驗證', 'bad', `HTTP ${r.status}：${(j.error && j.error.message) || ''}`); return; }
+  step('連到 Google', 'ok', `金鑰有效，花了 ${Date.now() - t} ms`);
+  listed = null; try { localStorage.removeItem(MLIST); } catch (e) {}
+  const models = await availableModels(key);
+  step('可用模型', models.length ? 'ok' : 'bad', models.slice(0, 4).join('、') || '沒有可用的模型');
+  for (const [label, s] of [['一般回答', false], ['串流回答', true]]) {
+    t = Date.now();
+    try {
+      const g = await geminiCall('只回覆兩個字：好的', s ? { onText: () => {} } : {});
+      const fellBack = s && !g.streamed;
+      step(label, fellBack ? 'warn' : 'ok', `${g.model} 回答「${g.text.trim().slice(0, 10)}」，花了 ${((Date.now() - t) / 1000).toFixed(1)} 秒` + (fellBack ? '。串流連不上，已自動改用一般模式（答案會一次出現）' : ''));
+    } catch (e) { step(label, 'bad', (e && (e.message || e.code)) || '失敗'); }
+  }
 }
 export const aiReady = () => !!model || !!geminiKey();
 
