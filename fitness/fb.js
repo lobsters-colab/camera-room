@@ -45,15 +45,17 @@ export async function initFirebase() {
 }
 
 // 個人用：使用者自己的 Gemini API 金鑰（只存在這支手機）
-const GKEY = 'ft-gemini-key', GMOD = 'ft-gemini-model';
-const GMODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+const GKEY = 'ft-gemini-key', GMOD = 'ft-gemini-model2';  // model2：改成優先用最快的模型後重新挑選
+const GMODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 export const geminiKey = () => { try { return localStorage.getItem(GKEY) || ''; } catch (e) { return ''; } };
 export function setGeminiKey(k) { try { k ? localStorage.setItem(GKEY, k.trim()) : (localStorage.removeItem(GKEY), localStorage.removeItem(GMOD)); } catch (e) {} }
 const GBASE = 'https://generativelanguage.googleapis.com/v1beta/';
 let listed = null;
 // 向 Google 查詢這把金鑰可以用的模型，挑適合聊天的 flash 系列
+const MLIST = 'ft-gemini-models';
 async function availableModels(key) {
   if (listed) return listed;
+  try { const c = JSON.parse(localStorage.getItem(MLIST) || 'null'); if (c && c.k === key.slice(-6) && Date.now() - c.t < 24 * 3600e3 && c.list.length) return (listed = c.list); } catch (e) {}
   try {
     const r = await fetch(GBASE + 'models?pageSize=200', { headers: { 'x-goog-api-key': key } });
     if (r.status === 400 || r.status === 401 || r.status === 403) {
@@ -64,11 +66,13 @@ async function availableModels(key) {
     const j = await r.json();
     const ok = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
       .map(m => m.name.replace(/^models\//, ''))
-      .filter(n => /^gemini/.test(n) && !/(image|tts|audio|live|embed|vision|robotics|computer|native)/i.test(n));
+      .filter(n => /^gemini/.test(n) && !/(image|tts|audio|live|embed|vision|robotics|computer|native|thinking)/i.test(n));
     const ver = n => { const m = n.match(/gemini-(\d+(?:\.\d+)?)/); return m ? +m[1] : 0; };
-    const score = n => (/latest/.test(n) ? 3 : 0) + (/flash/.test(n) ? 2 : 0) + (/lite/.test(n) ? 0.5 : 0) - (/(preview|exp)/.test(n) ? 1.5 : 0) + ver(n) / 10;
+    // 速度優先：Flash-Lite > Flash > 其他；Pro 最慢排最後
+    const score = n => (/lite/.test(n) ? 4 : 0) + (/flash/.test(n) ? 3 : 0) + (/latest/.test(n) ? 1 : 0) - (/pro/.test(n) ? 4 : 0) - (/(preview|exp)/.test(n) ? 1.5 : 0) + ver(n) / 10;
     ok.sort((x, y) => score(y) - score(x));
     listed = ok.length ? ok.slice(0, 10) : GMODELS;
+    try { localStorage.setItem(MLIST, JSON.stringify({ k: key.slice(-6), t: Date.now(), list: listed })); } catch (e) {}
   } catch (e) { if (e && e.code === 'bad_key') throw e; listed = GMODELS; }
   return listed;
 }
@@ -90,29 +94,58 @@ async function geminiCall(prompt, opts = {}) {
   // 跳過免費版不能用的模型（只在找可用模型時才會換）
   const okList = all.filter(m => !qBlocked(m)), list = okList.length ? okList : all;
   let lastErr = '', quotaHits = 0, switched = false;
+  // 把「思考」降到最低：2.x 用 thinkingBudget，3.x 以後與 latest 別名用 thinkingLevel
+  const thinkCfg = m => /gemini-2\./.test(m) ? { thinkingBudget: /pro/.test(m) ? 128 : 0 } : { thinkingLevel: /pro/.test(m) ? 'low' : 'minimal' };
+  const stream = !!opts.onText && !opts.json;
   for (const m of list) {
-    let r;
-    try {
-      r = await fetch(`${GBASE}models/${m}:generateContent`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({ contents: [{ role: 'user', parts: [...(opts.images || []).map(im => ({ inline_data: { mime_type: im.mime, data: im.data } })), { text: prompt }] }],
-          ...(opts.json ? { generationConfig: { responseMimeType: 'application/json' } } : {}) })
-      });
-    } catch (e) { throw { code: 'network', message: String(e && e.message || e) }; }
-    const j = await r.json().catch(() => ({}));
-    const msg = (j.error && j.error.message) || '';
-    if (r.status === 404 || (/model/i.test(msg) && /(not found|not supported|deprecated|no longer)/i.test(msg))) { lastErr = m + '：' + (msg || '404'); if (m === pref) try { localStorage.removeItem(GMOD); } catch (e) {} switched = true; continue; }
-    if (r.status === 429) throw { code: 'quota', message: msg };  // 額度用完就直接停，不自動換模型
-    if (r.status === 400 || r.status === 401 || r.status === 403) {
-      if (/api key|API_KEY/i.test(msg)) throw { code: 'bad_key', message: msg };
-      if (/free tier|not available|permission/i.test(msg)) { const q = qGet(); q[m] = Date.now() + 24 * 3600e3; try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) {} }
-      lastErr = m + '：' + (msg || 'HTTP ' + r.status); switched = true; continue;                         // 這個模型免費版不能用 → 換下一個
+    const NT = 'ft-nothink'; let ntSet = []; try { ntSet = JSON.parse(localStorage.getItem(NT) || '[]'); } catch (e) {}
+    let r, j = {}, msg = '', noThink = ntSet.includes(m);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const gc = { ...(opts.json ? { responseMimeType: 'application/json' } : {}), ...(noThink ? {} : { thinkingConfig: thinkCfg(m) }) };
+      try {
+        r = await fetch(`${GBASE}models/${m}:${stream ? 'streamGenerateContent?alt=sse' : 'generateContent'}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, signal: opts.signal,
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [...(opts.images || []).map(im => ({ inline_data: { mime_type: im.mime, data: im.data } })), { text: prompt }] }], generationConfig: gc })
+        });
+      } catch (e) { if (e && e.name === 'AbortError') throw e; throw { code: 'network', message: String(e && e.message || e) }; }
+      if (r.ok) break;
+      j = await r.json().catch(() => ({})); msg = (j.error && j.error.message) || '';
+      if (r.status === 400 && !noThink && /think/i.test(msg)) { noThink = true; try { localStorage.setItem(NT, JSON.stringify([...ntSet, m])); } catch (e) {} continue; }  // 這個模型不支援調整思考 → 不帶設定再試一次
+      break;
     }
-    if (!r.ok) { lastErr = m + '：HTTP ' + r.status + ' ' + msg; switched = true; continue; }
-    if (!switched || !pref) { try { localStorage.setItem(GMOD, m); } catch (e) {} }  // 因額度暫時換模型時，不改掉原本的首選
-    const c = j.candidates && j.candidates[0];
-    const text = ((c && c.content && c.content.parts) || []).map(p => p.text || '').join('');
-    if (!text) throw { code: 'unavailable', message: 'AI 沒有回覆內容' + (c && c.finishReason ? '（' + c.finishReason + '）' : '') };
+    if (!r.ok) {
+      if (r.status === 404 || (/model/i.test(msg) && /(not found|not supported|deprecated|no longer)/i.test(msg))) { lastErr = m + '：' + (msg || '404'); if (m === pref) try { localStorage.removeItem(GMOD); } catch (e) {} switched = true; continue; }
+      if (r.status === 429) throw { code: 'quota', message: msg };  // 額度用完就直接停，不自動換模型
+      if (r.status === 400 || r.status === 401 || r.status === 403) {
+        if (/api key|API_KEY/i.test(msg)) throw { code: 'bad_key', message: msg };
+        if (/free tier|not available|permission/i.test(msg)) { const q = qGet(); q[m] = Date.now() + 24 * 3600e3; try { localStorage.setItem(QKEY, JSON.stringify(q)); } catch (e) {} }
+        lastErr = m + '：' + (msg || 'HTTP ' + r.status); switched = true; continue;
+      }
+      lastErr = m + '：HTTP ' + r.status + ' ' + msg; switched = true; continue;
+    }
+    if (!switched || !pref) { try { localStorage.setItem(GMOD, m); } catch (e) {} }
+    let text = '', finish = '';
+    if (stream && r.body && r.body.getReader) {
+      // 邊產生邊顯示
+      const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+      for (;;) {
+        const { value, done } = await rd.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i; while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+          if (!line.startsWith('data:')) continue;
+          try { const d = JSON.parse(line.slice(5)); const c = d.candidates && d.candidates[0];
+            const t = ((c && c.content && c.content.parts) || []).filter(p => !p.thought).map(p => p.text || '').join('');
+            if (c && c.finishReason) finish = c.finishReason;
+            if (t) { text += t; opts.onText({ text, delta: t }); } } catch (e) {}
+        }
+      }
+    } else {
+      j = await r.json().catch(() => ({}));
+      const c = j.candidates && j.candidates[0]; finish = c && c.finishReason || '';
+      text = ((c && c.content && c.content.parts) || []).filter(p => !p.thought).map(p => p.text || '').join('');
+    }
+    if (!text) throw { code: 'unavailable', message: 'AI 沒有回覆內容' + (finish ? '（' + finish + '）' : '') };
     return { text, model: m, fallback: switched };
   }
   throw { code: 'unavailable', message: lastErr || '找不到可用的模型' };
@@ -169,7 +202,7 @@ export async function aiCall(prompt, opts = {}) {
     let text, used = '';
     if (model) text = (await model.generateContent(opts.images && opts.images.length ? [prompt, ...opts.images.map(im => ({ inlineData: { data: im.data, mimeType: im.mime } }))] : prompt)).response.text();
     else { const g = await geminiCall(prompt, opts); text = g.text; used = g.model; }
-    if (opts.onText) opts.onText({ text, delta: text });
+    if (opts.onText && (model || opts.json)) opts.onText({ text, delta: text });
     return { text, model: used };
   } catch (e) {
     if (e && ['quota', 'bad_key', 'network', 'unavailable'].includes(e.code) && !model) throw e;
