@@ -241,7 +241,7 @@ input.sec { width: 64px; flex: none; text-align: center; }
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.94); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; z-index: 10; }
 .overlay.on { display: flex; }
 .overlay img, .overlay video { max-width: 100%; max-height: 76%; border-radius: 4px; }
-.overlay img[hidden], .overlay video[hidden] { display: none; }
+.overlay img[hidden], .overlay video[hidden], .overlay button[hidden] { display: none; }
 .overlay p { margin: 0; font-size: 14px; text-align: center; }
 @media (max-height: 560px) { .panel { height: 190px; } .chip canvas { height: 50px; } }
 </style>
@@ -379,7 +379,8 @@ input.sec { width: 64px; flex: none; text-align: center; }
   <img id="overlayImg" alt="完成的照片">
   <video id="overlayVid" controls playsinline hidden></video>
   <p id="overlayMsg">長按圖片即可儲存到相簿</p>
-  <button class="save" id="overlayClose" type="button">關閉</button>
+  <button class="save" id="overlayShare" type="button" hidden>存到相簿</button>
+  <button class="tbtn" id="overlayClose" type="button">關閉</button>
 </div>
 
 <script>
@@ -816,6 +817,7 @@ function eraseFromPhoto(full, maskCanvas) {
   } else {
     fctx.drawImage(work, 0, 0, ww, wh, cx, cy, cw, ch);
   }
+  full.__ver = (full.__ver || 0) + 1;
   return undo;
 }
 
@@ -1317,6 +1319,9 @@ function loadPrefs() {
   } catch (e) { return false; }
 }
 
+// iOS releases canvas memory only when a canvas shrinks to 0x0, so do that for canvases we drop
+function freeCanvas(...cs) { for (const c of cs) if (c && c.width) { c.width = 0; c.height = 0; } }
+const FULL_MAX = 4096; // longest side kept for editing/export
 function scaledCanvas(img, max) {
   const s = Math.min(1, max / Math.max(img.width, img.height));
   const c = document.createElement("canvas");
@@ -1405,9 +1410,52 @@ function makeSample() {
   x.fillStyle = "#b5605a"; x.beginPath(); x.ellipse(600, 555, 18, 6, 0, 0, 7); x.fill();
   return c;
 }
-function addPhoto(source, name, sample, date) {
-  const prev = scaledCanvas(source, PREVIEW_MAX);
-  state.photos.push({ name, full: source, prev, prevLow: scaledCanvas(source, 720), skin: skinOf(prev), sample: !!sample, date: date || null, thumb: scaledCanvas(source, 120).toDataURL("image/jpeg", 0.8), mask: null, undo: [] });
+// source: a canvas or ImageBitmap to build the previews from; src: the original file to re-decode later.
+// Only the sample keeps its full canvas; real photos are decoded again from src when needed.
+function addPhoto(source, name, sample, date, src) {
+  const prev = scaledCanvas(source, PREVIEW_MAX), th = scaledCanvas(source, 120);
+  const photo = { name, src: src || null, full: src ? null : source, prev, prevLow: scaledCanvas(source, 720), skin: skinOf(prev), sample: !!sample, date: date || null, thumb: th.toDataURL("image/jpeg", 0.8), mask: null, undo: [], dirty: false };
+  freeCanvas(th);
+  state.photos.push(photo);
+  return photo;
+}
+async function ensureFull(photo) {
+  if (photo.full && photo.full.width) return photo.full;
+  const bmp = await createImageBitmap(photo.src, { imageOrientation: "from-image" });
+  photo.full = scaledCanvas(bmp, FULL_MAX);
+  if (bmp.close) bmp.close();
+  return photo.full;
+}
+async function ensureLoaded(photo) {
+  if (photo.prev && photo.prev.width) return;
+  const keepFull = photo.full && photo.full.width, f = await ensureFull(photo);
+  photo.prev = scaledCanvas(f, PREVIEW_MAX); photo.prevLow = scaledCanvas(f, 720); photo.skin = skinOf(photo.prev);
+  if (!keepFull && !photo.dirty) { freeCanvas(f); photo.full = null; }
+}
+// drop a photo's big canvases; edits are kept by re-encoding the full image first
+async function unloadPhoto(photo) {
+  if (!photo || photo.sample) return;
+  if (photo.dirty && photo.full && photo.full.width) { photo.src = await new Promise(r => photo.full.toBlob(r, "image/jpeg", 0.95)); photo.dirty = false; }
+  if (!photo.src) return;
+  freeCanvas(photo.full, photo.prev, photo.prevLow, photo.chipSrc, photo.mask);
+  photo.full = photo.prev = photo.prevLow = photo.chipSrc = photo.mask = null; photo.det = null;
+}
+// after an export, free the full canvas unless it holds unsaved erase edits
+function dropFullIfClean(photo) {
+  if (photo.src && !photo.dirty && photo.full) { freeCanvas(photo.full); photo.full = null; }
+  if (GPU && GPU.release) GPU.release();
+}
+let selectToken = 0;
+async function selectPhoto(i) {
+  const token = ++selectToken, old = curPhoto(), next = state.photos[i];
+  if (!next) return;
+  if (!next.prev || !next.prev.width) say("讀取照片中…", true);
+  try { await ensureLoaded(next); } catch (e) { say("這張照片讀不出來"); return; }
+  if (token !== selectToken) return;
+  state.cur = i;
+  if (old && old !== next) unloadPhoto(old);
+  say("");
+  renderThumbs(); renderChips(); renderTemplates(); renderEraseTools(); renderPreview();
 }
 
 // ---------- UI rendering ----------
@@ -1420,7 +1468,7 @@ function renderThumbs() {
     const im = document.createElement("img");
     im.src = p.thumb; im.alt = p.name; im.tabIndex = 0;
     if (i === state.cur) im.className = "on";
-    const pick = () => { state.cur = i; renderThumbs(); renderChips(); renderTemplates(); renderEraseTools(); renderPreview(); };
+    const pick = () => selectPhoto(i);
     im.onclick = pick; im.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
     t.appendChild(im);
   });
@@ -1582,28 +1630,76 @@ let downloads = null;
 })();
 const toBlob = canvas => new Promise(res => canvas.toBlob(res, "image/jpeg", 0.95));
 async function exportPhoto(photo) {
+  if (!photo.skin) await ensureLoaded(photo);
+  const full = await ensureFull(photo);
   const P = effP(currentFilter().p), tmp = document.createElement("canvas"), out = document.createElement("canvas");
-  renderGraded(tmp, sourceFor(photo.full, state.frame), P, optsFor(photo, P));
+  const src = sourceFor(full, state.frame);
+  renderGraded(tmp, src, P, optsFor(photo, P));
+  if (src !== full) freeCanvas(src);
   compose(out, tmp, state.frame, $("caption").value.trim());
+  freeCanvas(tmp);
+  const blob = await toBlob(out);
+  freeCanvas(out);
+  if (!blob) throw new Error("toBlob");
+  dropFullIfClean(photo);
   const base = (photo.name || "photo").replace(/\.[^.]+$/, "");
-  return { blob: await toBlob(out), name: `${base}_${state.filter}.jpg` };
+  return { blob, name: `${base}_${state.filter}.jpg` };
 }
-async function deliver(file, multi, tries) {
+async function deliver(file, multi, tries) { return deliverMany([file], tries); }
+function isIOSDevice() { return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+// Safari only opens the share sheet right after a tap; after slow processing, ask for one more tap
+function tapToShare(files) {
+  return new Promise(resolve => {
+    const ov = $("overlay"), url = URL.createObjectURL(files[0].blob), vid = !!files[0].video;
+    $("overlayImg").hidden = vid; $("overlayVid").hidden = !vid;
+    if (vid) $("overlayVid").src = url; else $("overlayImg").src = url;
+    $("overlayMsg").textContent = files.length > 1 ? `${files.length} 個檔案處理好了` : "處理好了";
+    $("overlayShare").hidden = false; $("overlayShare").textContent = vid ? "存影片" : files.length > 1 ? `存 ${files.length} 張到相簿` : "存到相簿";
+    ov.classList.add("on");
+    const done = r => { ov.classList.remove("on"); $("overlayShare").hidden = true; $("overlayVid").pause(); URL.revokeObjectURL(url); resolve(r); };
+    $("overlayShare").onclick = async () => {
+      try { await navigator.share({ files: files.map(f => new File([f.blob], f.name, { type: f.blob.type || "image/jpeg" })) }); done("saved"); }
+      catch (e) { if (e && e.name === "AbortError") done("declined"); else { $("overlayMsg").textContent = "無法開啟分享，請長按圖片儲存"; $("overlayShare").hidden = true; } }
+    };
+    $("overlayClose").onclick = () => done("declined");
+  });
+}
+async function deliverMany(files, tries) {
+  if (downloads) {
+    let saved = 0;
+    for (const file of files) {
+      const r = await deliverOne(file, files.length > 1, tries);
+      if (r === "declined") return saved ? "saved" : "declined";
+      saved++;
+    }
+    return "saved";
+  }
+  const standalone = window.self === window.top;
+  if (standalone) {
+    const fs = files.map(f => new File([f.blob], f.name, { type: f.blob.type || "image/jpeg" }));
+    if (navigator.canShare && navigator.canShare({ files: fs })) {
+      try { await navigator.share({ files: fs }); return "saved"; }
+      catch (e) {
+        if (e && e.name === "AbortError") return "declined";
+        if (e && e.name === "NotAllowedError") return tapToShare(files);
+      }
+    }
+  }
+  let last = "shown";
+  for (const file of files) { last = await deliverOne(file, files.length > 1, tries); if (last === "declined") break; }
+  return last;
+}
+async function deliverOne(file, multi, tries) {
   if (downloads) {
     try { await downloads.save({ filename: file.name, data: file.blob }); return "saved"; }
     catch (e) {
       if (e && e.code === "declined") return "declined";
-      if (e && e.code === "rate_limited" && (tries || 0) < 3) { await new Promise(r => setTimeout(r, 1500)); return deliver(file, multi, (tries || 0) + 1); }
+      if (e && e.code === "rate_limited" && (tries || 0) < 3) { await new Promise(r => setTimeout(r, 1500)); return deliverOne(file, multi, (tries || 0) + 1); }
     }
   }
   const standalone = window.self === window.top;
   if (standalone && !downloads) {
-    try {
-      const f = new File([file.blob], file.name, { type: file.blob.type || "image/jpeg" });
-      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f] }); return "saved"; }
-    } catch (e) { if (e && e.name === "AbortError") return "declined"; }
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (!isIOS) {
+    if (!isIOSDevice()) {
       const u = URL.createObjectURL(file.blob), a = document.createElement("a");
       a.href = u; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(u), 10000);
@@ -1640,37 +1736,40 @@ $("saveOne").onclick = async () => {
   } catch (e) { busy(false, "處理失敗，照片可能太大，請再試一次"); }
 };
 $("saveAll").onclick = async () => {
-  const list = state.photos.filter(p => !p.sample);
-  let n = 0;
+  const list = state.photos.filter(p => !p.sample), files = [];
   try {
     for (const p of list) {
-      busy(true, `處理中 ${n+1} / ${list.length}…`); await tick();
-      const res = await deliver(await exportPhoto(p), list.length > 1);
-      if (res === "declined") break;
-      n++;
+      busy(true, `處理中 ${files.length + 1} / ${list.length}…`); await tick();
+      files.push(await exportPhoto(p));
+      if (p !== curPhoto()) await unloadPhoto(p);
     }
-    busy(false, `完成 ${n} / ${list.length} 張`);
-  } catch (e) { busy(false, `完成 ${n} 張後發生錯誤，請再試一次`); }
+  } catch (e) { busy(false, `第 ${files.length + 1} 張處理失敗，先存已完成的 ${files.length} 張`); }
+  if (!files.length) { busy(false, "處理失敗，請再試一次"); return; }
+  const res = await deliverMany(files);
+  busy(false, res === "saved" ? `已儲存 ${files.length} 張` : res === "declined" ? "已取消儲存" : "");
 };
 
 // ---------- Inputs ----------
 $("file").onchange = async e => {
   const files = [...e.target.files]; if (!files.length) return;
   say("讀取照片中…", true);
+  const before = curPhoto();
   state.photos = state.photos.filter(p => !p.sample);
   const start = state.photos.length; let failed = "";
   for (const f of files) {
     try {
       const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
-      const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height;
-      c.getContext("2d").drawImage(bmp, 0, 0);
       let date = null;
       try { date = exifDate(await f.slice(0, 262144).arrayBuffer()); } catch (err) {}
-      addPhoto(c, f.name, false, date);
+      const p = addPhoto(bmp, f.name, false, date, f);
+      if (bmp.close) bmp.close();
+      // only the photo on screen keeps its previews
+      if (state.photos.length - 1 !== start) unloadPhoto(p);
     } catch (err) { failed = `${f.name} 無法讀取，請換成 JPG 或 PNG`; }
   }
   if (!state.photos.length) addPhoto(makeSample(), "sample", true);
   state.cur = Math.min(start, state.photos.length - 1);
+  if (before && before !== curPhoto()) unloadPhoto(before);
   say(failed);
   e.target.value = "";
   renderThumbs(); renderChips(); renderTemplates(); renderEraseTools(); renderPreview();
@@ -1708,8 +1807,9 @@ function syncPaint() {
   if (photo.mask) ctx.drawImage(photo.mask, 0, 0, pc.width, pc.height);
 }
 function refreshPhoto(photo) {
+  freeCanvas(photo.prev, photo.prevLow, photo.chipSrc);
   photo.prev = scaledCanvas(photo.full, PREVIEW_MAX); photo.prevLow = scaledCanvas(photo.full, 720); photo.skin = skinOf(photo.prev); photo.det = null; photo.chipSrc = null; photo.rec = null;
-  photo.thumb = scaledCanvas(photo.full, 120).toDataURL("image/jpeg", 0.8);
+  const th = scaledCanvas(photo.full, 120); photo.thumb = th.toDataURL("image/jpeg", 0.8); freeCanvas(th);
   renderThumbs(); renderChips(); renderTemplates(); renderEraseTools(); renderPreview();
 }
 function renderEraseTools() {
@@ -1729,7 +1829,11 @@ function renderEraseTools() {
   mk("clear", "清除塗抹", "", null, () => { if (photo.mask) photo.mask.getContext("2d").clearRect(0, 0, photo.mask.width, photo.mask.height); syncPaint(); });
   mk("reset", "復原", photo.undo.length ? String(photo.undo.length) : "", null, () => {
     const u = photo.undo.pop(); if (!u) { say("沒有可以復原的步驟"); return; }
-    photo.full.getContext("2d").putImageData(u.data, u.x, u.y); refreshPhoto(photo); say("已復原");
+    ensureFull(photo).then(full => {
+      full.getContext("2d").putImageData(u.data, u.x, u.y);
+      full.__ver = (full.__ver || 0) + 1; photo.dirty = true;
+      refreshPhoto(photo); say("已復原");
+    }).catch(() => say("復原失敗"));
   });
 }
 // Fallback when the on-device model is not available here: ask Claude where the passersby are.
@@ -1779,12 +1883,15 @@ $("applyErase").onclick = async () => {
   busy(true, sessions.inpaint ? "AI 消除中…" : "AI 準備中，第一次要下載模型…"); $("applyErase").disabled = true; await tick();
   try {
     let u = null;
+    const full = await ensureFull(photo);
     if (aiErase) {
-      try { u = await eraseAI(photo.full, photo.mask); }
+      try { u = await eraseAI(full, photo.mask); }
       catch (e) { aiErase = false; }
     }
-    if (!aiErase) { say("AI 模型無法使用，改用基本消除…", true); await tick(); u = eraseFromPhoto(photo.full, photo.mask); }
+    if (!aiErase) { say("AI 模型無法使用，改用基本消除…", true); await tick(); u = eraseFromPhoto(full, photo.mask); }
     if (!u) { busy(false, "先把要消除的地方塗紅"); return; }
+    photo.dirty = true;
+    if (GPU && GPU.release) GPU.release();
     photo.undo.push(u); if (photo.undo.length > 8) photo.undo.shift();
     photo.mask.getContext("2d").clearRect(0, 0, photo.mask.width, photo.mask.height);
     refreshPhoto(photo);
@@ -1862,9 +1969,13 @@ const TEMPLATES = [
   { id: "t-ccd",    name: "CCD 冷白",   filter: "ccd",    adj: { bright: 6, temp: -6 }, stamp: true },
 ];
 const TPL_KEY = "darkroom-templates";
-function userTemplates() { try { const v = JSON.parse(localStorage.getItem(TPL_KEY) || "[]"); return Array.isArray(v) ? v.filter(t => t && t.id && FILTERS.some(f => f.id === t.filter)) : []; } catch (e) { return []; } }
+function userTemplates() { try { const v = JSON.parse(localStorage.getItem(TPL_KEY) || "[]"); return Array.isArray(v) ? v.filter(t => t && typeof t.id === "string" && typeof t.name === "string" && FILTERS.some(f => f.id === t.filter) && FRAMES.some(f => f[0] === (t.frame || "none"))) : []; } catch (e) { return []; } }
 function saveUserTemplates(list) { try { localStorage.setItem(TPL_KEY, JSON.stringify(list)); return true; } catch (e) { return false; } }
-const tplAdj = t => { const a = {}; PARAMS.forEach(p => { if (!p.ui) a[p.id] = t.adj && t.adj[p.id] != null ? t.adj[p.id] : p.def; }); return a; };
+const tplAdj = t => {
+  const a = {};
+  PARAMS.forEach(p => { if (p.ui) return; const v = Number(t.adj && t.adj[p.id]); a[p.id] = t.adj && t.adj[p.id] != null && Number.isFinite(v) ? Math.round(Math.min(p.max, Math.max(p.min, v))) : p.def; });
+  return a;
+};
 
 // Look at the photo and pick the template that suits it.
 function recommend(photo) {
@@ -1971,6 +2082,8 @@ if (document.fonts) Promise.all([document.fonts.load('500 40px "DM Mono"'), docu
 const R = { lib: [], proj: null, sel: null, ctab: "tpl", reel: null, med: new Map(), filt: new Map(), cut: new Map() };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const libItem = id => R.lib.find(x => x.id === id);
+// keep a cache to `max` entries, freeing the canvases it drops
+function evict(map, max) { while (map.size > max) { const k = map.keys().next().value, c = map.get(k); map.delete(k); freeCanvas(c); } }
 
 // ---------- Photo library ----------
 async function decodeFile(it, maxSide) {
@@ -1985,7 +2098,7 @@ async function getMed(id) {
   const it = libItem(id); if (!it) return null;
   const c = await decodeFile(it, 1440);
   R.med.set(id, c);
-  while (R.med.size > 18) R.med.delete(R.med.keys().next().value);
+  evict(R.med, 8);
   return c;
 }
 function coverThumb(src, s) {
@@ -2216,18 +2329,19 @@ function coverGeom(img, rect, cell) {
   cell.cx = Math.min(1 - mx, Math.max(mx, cell.cx)); cell.cy = Math.min(1 - my, Math.max(my, cell.cy));
   return { x: rect.x + rect.w / 2 - cell.cx * iw, y: rect.y + rect.h / 2 - cell.cy * ih, w: iw, h: ih };
 }
-function filtered(src, key, filterId) {
+function filtered(src, key, filterId, noCache) {
   if (!filterId || filterId === "none" || !GPU) return src;
   const k = key + "|" + filterId;
-  if (R.filt.has(k)) return R.filt.get(k);
+  if (!noCache && R.filt.has(k)) return R.filt.get(k);
   const f = FILTERS.find(x => x.id === filterId); if (!f) return src;
   const P = effP(f.p, Object.fromEntries(PARAMS.map(p => [p.id, p.def])));
-  const skin = sampleSkin(src.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, src.width, src.height).data, src.width, src.height);
+  const sm = scaledCanvas(src, 300);
+  const skin = sampleSkin(sm.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, sm.width, sm.height).data, sm.width, sm.height);
+  freeCanvas(sm);
   const g = GPU.render(src, P, { exposure: solveExposure(skin, P, true, 0), strength: 1, grain: 1 }, null);
   if (!g) return src;
   const c = document.createElement("canvas"); c.width = src.width; c.height = src.height; c.getContext("2d").drawImage(g, 0, 0);
-  R.filt.set(k, c);
-  while (R.filt.size > 24) R.filt.delete(R.filt.keys().next().value);
+  if (!noCache) { R.filt.set(k, c); evict(R.filt, 8); }
   return c;
 }
 // image for a cell in the live preview: medium copy when ready, small copy meanwhile
@@ -2721,18 +2835,27 @@ async function exportCollage() {
   const ratio = RATIOS[R.proj.ratio] || 1.25, W = $("cHQ").checked ? 2160 : 1080, H = Math.round(W * ratio);
   busy(true, "正在用原始畫質輸出…"); await tick();
   try {
-    const L = layout(R.proj, W, H), imgs = new Map();
-    for (let i = 0; i < L.cells.length; i++) {
-      const c = R.proj.cells[i]; if (!c || !c.pid || imgs.has(c.pid)) continue;
-      const r = L.cells[i], it = libItem(c.pid), need = Math.min(3000, Math.ceil(Math.max(r.w / it.w * it.h, r.h, r.w, r.h / it.h * it.w) * c.z * 1.15));
-      const src = await decodeFile(it, Math.max(need, Math.min(1440, Math.max(it.w, it.h))));
-      imgs.set(c.pid, filtered(src, c.pid + "x" + src.width, R.proj.filter));
+    const L = layout(R.proj, W, H), imgs = new Map(), need = new Map();
+    // each photo is decoded once, just large enough to cover its biggest cell (zoom included)
+    L.cells.forEach((r, i) => {
+      const c = R.proj.cells[i], it = c && c.pid && libItem(c.pid); if (!it) return;
+      const s = Math.max(r.w / it.w, r.h / it.h) * c.z, n = Math.min(3000, Math.ceil(s * Math.max(it.w, it.h) * 1.05));
+      need.set(c.pid, Math.max(need.get(c.pid) || 0, n, 256));
+    });
+    for (const [pid, n] of need) {
+      const src = await decodeFile(libItem(pid), n), img = filtered(src, pid, R.proj.filter, true);
+      if (img !== src) freeCanvas(src);
+      imgs.set(pid, img);
       await tick();
     }
+    if (GPU && GPU.release) GPU.release();
     const out = document.createElement("canvas"); out.width = W; out.height = H;
     drawProject(out.getContext("2d"), W, H, R.proj, pid => imgs.get(pid) || null, null);
-    for (const k of [...R.filt.keys()]) if (k.includes("x")) R.filt.delete(k);
+    for (const c of imgs.values()) freeCanvas(c);
+    imgs.clear();
     const blob = await new Promise(res => out.toBlob(res, "image/jpeg", 0.93));
+    freeCanvas(out);
+    if (!blob) throw new Error("toBlob");
     const res = await deliver({ blob, name: `collage_${dayKey(new Date())}.jpg` }, false);
     busy(false, res === "saved" ? "已儲存拼貼" : res === "declined" ? "已取消儲存" : "");
   } catch (e) { busy(false, "輸出失敗，試試關掉高畫質再存一次"); }

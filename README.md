@@ -10,3 +10,18 @@
 ## 健身追蹤
 
 手機健身紀錄 App：https://lobsters-colab.github.io/camera-room/fitness/
+
+## 開發
+
+`index.html` 是組出來的檔案，請改 `src/` 裡的原始碼，再執行：
+
+```
+python3 src/build.py
+```
+
+- `src/head.html`：頁面結構與樣式
+- `src/app.js`：修圖模式（濾鏡、調整、消除、邊框、模板），內含 `/*CORE*/`、`/*EXIF*/` 兩個插入點
+- `src/core2.js`、`gl.js`：調色核心（CPU／WebGL）
+- `src/inpaint.js`、`detect.js`：基本消除、AI 模型（MI-GAN、YOLOv8n-seg、U²-Net）
+- `src/recap.js`、`reel.js`、`modes.js`：拼貼、回顧影片、首頁與模式切換
+- 更換 `model/` 或 `ort/` 的檔案時，要同時改 `sw.js` 的 `CACHE` 版本號，手機才會重新下載

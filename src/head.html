@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0c0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="濾鏡暗房">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>相機濾鏡暗房</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: one-screen editor — top bar, big preview, tool panel, bottom tab bar */
+  --bg: #0c0c0d;
+  --panel: #161618;
+  --raise: #232326;
+  --line: #2e2e33;
+  --text: #f4f1ec;
+  --muted: #8f8b85;
+  --accent: #ff9a2e;
+  --font-display: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); overflow: hidden; }
+button, input { font-family: inherit; color: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, .tbtn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.app { height: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; }
+
+/* top bar */
+.topbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); }
+.tbtn { position: relative; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 12px; border-radius: 999px; background: var(--raise); border: 0; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.tbtn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.title { flex: 1; min-width: 0; text-align: center; font-family: var(--font-display); font-size: 11px; color: var(--muted); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.save { min-height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--accent); color: #1a1006; font-size: 14px; font-weight: 700; }
+button:disabled { opacity: .5; }
+.tright { display: flex; gap: 8px; }
+
+/* photo strip */
+.thumbs { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 8px; scrollbar-width: none; }
+.thumbs:empty { display: none; }
+.thumbs img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 2px solid transparent; flex: none; opacity: .6; }
+.thumbs img.on { border-color: var(--accent); opacity: 1; }
+
+/* preview */
+.stage { position: relative; flex: 1; min-height: 120px; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+.fit { position: absolute; inset: 4px 12px; display: grid; place-items: center; overflow: hidden; }
+.fit canvas { grid-area: 1 / 1; display: block; border-radius: 2px; }
+#paint { opacity: .55; pointer-events: none; }
+#paint[hidden], .cmp[hidden] { display: none; }
+.cmp { position: absolute; right: 16px; bottom: 10px; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 0; background: rgba(20,20,22,.78); font-size: 12px; }
+.status { position: absolute; left: 50%; top: 6px; z-index: 2; transform: translateX(-50%); margin: 0; padding: 6px 12px; border-radius: 999px; background: rgba(20,20,22,.85); font-size: 12px; white-space: nowrap; max-width: 70%; overflow: hidden; text-overflow: ellipsis; }
+.status:empty { display: none; }
+
+/* tool panel */
+.panel { flex: none; height: 222px; background: var(--panel); border-radius: 16px 16px 0 0; padding: 12px 0 6px; display: flex; flex-direction: column; }
+.panel section { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.panel section[hidden] { display: none; }
+.pad { padding: 0 16px; }
+.hscroll { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 2px; scrollbar-width: none; }
+.hscroll::-webkit-scrollbar, .thumbs::-webkit-scrollbar { display: none; }
+
+/* ruler slider row: label, draggable scale, exact number */
+.srow { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 8px; padding: 0 12px 0 16px; min-height: 44px; }
+.srow .sl-label { font-size: 13px; white-space: nowrap; }
+.ruler { position: relative; height: 40px; min-width: 0; touch-action: none; cursor: ew-resize; border-radius: 8px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
+.ruler canvas { display: block; }
+.ruler:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { display: flex; align-items: center; background: var(--raise); border-radius: 8px; overflow: hidden; }
+.num button { width: 30px; height: 34px; border: 0; background: transparent; font-size: 16px; color: var(--muted); }
+.num input { width: 46px; height: 34px; border: 0; background: transparent; text-align: center; font-family: var(--font-display); font-size: 14px; color: var(--accent); font-variant-numeric: tabular-nums; padding: 0; -moz-appearance: textfield; appearance: textfield; }
+.num input::-webkit-outer-spin-button, .num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* category pills */
+.pills button { flex: none; min-height: 28px; padding: 0 12px; border-radius: 999px; border: 0; background: transparent; color: var(--muted); font-size: 13px; }
+.pills button[aria-pressed="true"] { background: var(--raise); color: var(--text); }
+
+/* filter chips */
+.chip { flex: none; width: 66px; padding: 0; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--muted); }
+.chip[hidden] { display: none; }
+.chip canvas { width: 66px; height: 66px; border-radius: 8px; display: block; background: #000; border: 2px solid transparent; }
+.chip span { font-size: 11px; line-height: 1.2; white-space: nowrap; }
+.chip[aria-pressed="true"] { color: var(--accent); }
+.chip[aria-pressed="true"] canvas { border-color: var(--accent); }
+
+/* adjust tools */
+.tool { flex: none; width: 60px; padding: 0; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); }
+.tool i { width: 44px; height: 44px; border-radius: 50%; background: var(--raise); display: grid; place-items: center; }
+.tool svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tool span { font-size: 11px; white-space: nowrap; }
+.tool small { font-family: var(--font-display); font-size: 10px; height: 12px; color: var(--accent); }
+.tool[aria-pressed="true"] { color: var(--text); }
+.tool[aria-pressed="true"] i { background: var(--accent); color: #1a1006; }
+.tool.on i { color: var(--accent); }
+.tool.on[aria-pressed="true"] i { color: #1a1006; }
+.sep { flex: none; width: 1px; background: var(--line); margin: 6px 2px 28px; }
+
+
+/* modes */
+.addbtn { width: 36px; padding: 0; justify-content: center; font-size: 20px; flex: none; }
+.modes { flex: 1; display: flex; justify-content: center; gap: 2px; background: var(--raise); border-radius: 999px; padding: 3px; max-width: 220px; margin: 0 auto; }
+.modes button { flex: 1; min-height: 30px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; }
+.modes button[aria-pressed="true"] { background: var(--text); color: #141312; }
+.mode { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.mode[hidden] { display: none; }
+.thumbrow { flex: none; display: flex; align-items: center; gap: 8px; padding-right: 16px; }
+.thumbrow .thumbs { flex: 1; min-width: 0; }
+.thumbrow .tbtn { min-height: 30px; font-size: 12px; }
+.thumbrow .tbtn[hidden] { display: none; }
+.badge { position: absolute; left: 16px; bottom: 12px; padding: 5px 10px; border-radius: 999px; background: rgba(20,20,22,.78); font-family: var(--font-display); font-size: 11px; color: var(--muted); max-width: 55%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.badge:empty { display: none; }
+.tabbar.six { grid-template-columns: repeat(6, 1fr); }
+.tabbar.four { grid-template-columns: repeat(4, 1fr); }
+.cstage canvas { touch-action: none; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+.empty { position: absolute; inset: 0; display: grid; place-content: center; gap: 14px; text-align: center; background: rgba(12,12,13,.72); }
+.empty[hidden] { display: none; }
+.empty p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); }
+.empty .save { justify-self: center; min-height: 44px; }
+.scrolly { overflow-y: auto; padding-bottom: 6px; }
+.panel section > * { flex-shrink: 0; }
+.tcat { flex: none; align-self: center; writing-mode: vertical-rl; font-size: 10px; letter-spacing: .1em; color: var(--muted); padding: 0 2px; }
+.rcard small { font-size: 10px; color: var(--muted); margin-top: -3px; }
+.tpl > canvas { width: auto; height: 76px; max-width: 76px; object-fit: contain; background: transparent; border-radius: 6px; }
+#cRecs .tpl > canvas { height: 92px; max-width: 76px; }
+.tray-item { position: relative; flex: none; width: 58px; height: 58px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; background: var(--raise); }
+.tray-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tray-item.used img { opacity: .45; }
+.tray-item b { position: absolute; left: 3px; top: 3px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #1a1006; font-size: 10px; }
+.tray-add { flex: none; width: 58px; height: 58px; border-radius: 8px; border: 1px dashed var(--muted); background: transparent; font-size: 22px; color: var(--muted); }
+.deco { flex: none; width: 52px; height: 52px; padding: 4px; border: 0; border-radius: 10px; background: var(--raise); }
+.deco canvas { width: 100%; height: 100%; display: block; }
+.swrow { padding-top: 2px; }
+.sw { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); padding: 0; }
+.sw[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btnrow { display: flex; gap: 8px; }
+.btnrow .tbtn:disabled { opacity: .4; }
+.pills.pad { display: flex; gap: 6px; }
+#rFit { bottom: 52px; }
+.rctl { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 11px; color: var(--muted); }
+.rctl .tbtn { background: rgba(20,20,22,.85); }
+.mname { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+input.sec { width: 64px; flex: none; text-align: center; }
+
+
+/* home */
+.vh { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ttl { flex: 1; min-width: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.back { flex: none; }
+.back[hidden], .addbtn[hidden], .save[hidden] { display: none; }
+.home { overflow-y: auto; padding: 4px 16px 24px; gap: 12px; }
+.card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); text-align: left; min-height: 120px; }
+.card svg { width: 30px; height: 30px; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 4px; }
+.card-t { font-size: 17px; font-weight: 700; color: var(--text); }
+.card-d { font-size: 13px; line-height: 1.45; color: var(--muted); }
+.card:active { transform: scale(.98); }
+.hero { min-height: 150px; position: relative; overflow: hidden; background: linear-gradient(135deg, #3a2414, #1b1310 60%); border-color: #5a3a1e; justify-content: flex-end; }
+.hero .card-t { font-size: 22px; }
+.hero .card-d { color: #e6cdb3; max-width: 70%; }
+.hero-art { position: absolute; right: -6px; top: 14px; width: 120px; height: 110px; }
+.hero-art i { position: absolute; width: 62px; height: 74px; border-radius: 4px; background: #f6f3ea; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.hero-art i::after { content: ""; position: absolute; inset: 5px 5px 16px; border-radius: 2px; background: linear-gradient(160deg, #ffb36b, #b3475a); }
+.hero-art i:nth-child(1) { right: 54px; top: 18px; transform: rotate(-12deg); }
+.hero-art i:nth-child(1)::after { background: linear-gradient(160deg, #7fb7ff, #2b3a55); }
+.hero-art i:nth-child(2) { right: 26px; top: 6px; transform: rotate(4deg); }
+.hero-art i:nth-child(3) { right: 0; top: 26px; transform: rotate(14deg); }
+.hero-art i:nth-child(3)::after { background: linear-gradient(160deg, #ffe08a, #ff9a2e); }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cont { display: flex; flex-wrap: wrap; gap: 8px; }
+.cont:empty { display: none; }
+.cont .tbtn { min-height: 40px; }
+.note.center { text-align: center; padding: 0; }
+/* collage helpers */
+.ctx { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; pointer-events: none; }
+.ctx[hidden] { display: none; }
+.ctx button { pointer-events: auto; min-height: 38px; padding: 0 14px; border: 0; border-radius: 999px; background: rgba(20,20,22,.9); color: var(--text); font-size: 14px; font-weight: 500; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+.ctx button.go { background: var(--accent); color: #1a1006; }
+.ctx .hint { width: 100%; text-align: center; font-size: 12px; color: var(--text); text-shadow: 0 1px 4px rgba(0,0,0,.8); }
+.help { position: absolute; right: 14px; top: 8px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(20,20,22,.85); color: var(--text); font-size: 15px; font-weight: 700; z-index: 3; }
+.coach { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(8,8,9,.78); padding: 20px; }
+.coach[hidden] { display: none; }
+.coach-card { max-width: 320px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.coach-t { margin: 0; font-size: 18px; font-weight: 700; }
+.coach ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5; }
+.coach b { color: var(--accent); font-weight: 700; }
+.coach .save { align-self: stretch; min-height: 44px; }
+.subseg { padding-top: 0; }
+/* larger type and touch targets */
+.tabbar.five { grid-template-columns: repeat(5, 1fr); }
+.tabbar button { font-size: 12px; gap: 3px; padding: 7px 0; }
+.tabbar svg { width: 24px; height: 24px; }
+.tool span, .chip span, .tpl span { font-size: 12px; }
+.note { font-size: 13px; }
+.pills button { min-height: 34px; font-size: 14px; padding: 0 14px; }
+.tbtn { font-size: 14px; }
+.srow .sl-label { font-size: 14px; }
+.tray-item, .tray-add { width: 64px; height: 64px; }
+.field { font-size: 14px; }
+.panel { height: 236px; }
+
+
+/* templates */
+.tpl { position: relative; flex: none; width: 76px; padding: 0; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--muted); }
+.tpl canvas, .tpl i { width: 76px; height: 76px; border-radius: 10px; display: grid; place-items: center; background: var(--raise); border: 2px solid transparent; }
+.tpl i svg { width: 30px; height: 30px; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; }
+.tpl span { font-size: 11px; line-height: 1.2; white-space: nowrap; max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+.tpl[aria-pressed="true"] { color: var(--accent); }
+.tpl[aria-pressed="true"] canvas, .tpl[aria-pressed="true"] i { border-color: var(--accent); }
+.tpl .rec { position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #1a1006; font-size: 10px; font-weight: 700; }
+.tpl .del { position: absolute; top: -4px; right: -4px; width: 22px; height: 22px; border-radius: 50%; background: #3a3a3f; color: var(--text); font-size: 13px; line-height: 22px; text-align: center; }
+.savetpl input { height: 36px; }
+
+/* frames */
+.frame-opt { flex: none; width: 74px; padding: 0; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+.frame-opt i { width: 58px; height: 62px; border-radius: 8px; background: var(--raise); display: grid; place-items: center; border: 2px solid transparent; }
+.frame-opt b { display: block; background: #77726b; }
+.frame-opt[aria-pressed="true"] { color: var(--accent); }
+.frame-opt[aria-pressed="true"] i { border-color: var(--accent); }
+.field { display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 13px; }
+.field input[type=text] { flex: 1; min-width: 0; height: 38px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; font-size: 14px; }
+.field input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); }
+#stampText { font-family: var(--font-display); color: var(--accent); }
+.note { margin: 0; padding: 0 16px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* bottom tabs */
+.tabbar { flex: none; display: grid; grid-template-columns: repeat(6, 1fr); background: var(--panel); border-top: 1px solid var(--line); padding: 4px 8px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+.wide { width: 100%; min-height: 40px; }
+.tabbar button { border: 0; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; font-size: 11px; border-radius: 8px; }
+.tabbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tabbar button[aria-selected="true"] { color: var(--text); }
+.tabbar button[aria-selected="true"] svg { color: var(--accent); }
+
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.94); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; z-index: 10; }
+.overlay.on { display: flex; }
+.overlay img, .overlay video { max-width: 100%; max-height: 76%; border-radius: 4px; }
+.overlay img[hidden], .overlay video[hidden], .overlay button[hidden] { display: none; }
+.overlay p { margin: 0; font-size: 14px; text-align: center; }
+@media (max-height: 560px) { .panel { height: 190px; } .chip canvas { height: 50px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <button class="tbtn back" id="backBtn" type="button" hidden>‹ 首頁</button>
+    <span class="ttl" id="ttl">濾鏡暗房</span>
+    <label class="tbtn addbtn" id="addLabel" for="file" hidden><span aria-hidden="true">＋</span> 照片</label>
+    <button class="save" id="saveOne" type="button" hidden>儲存</button>
+  </div>
+  <input id="file" class="vh" type="file" accept="image/*" multiple tabindex="-1" aria-label="選擇要修的照片">
+  <input id="cFile" class="vh" type="file" accept="image/*" multiple tabindex="-1" aria-label="選擇照片">
+  <input id="rMusic" class="vh" type="file" accept="audio/*" tabindex="-1" aria-label="選擇音樂">
+
+  <div class="mode home" id="mode-home">
+    <button class="hero card" type="button" data-go="auto">
+      <span class="hero-art" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="card-t">一鍵美化</span>
+      <span class="card-d">選一張照片，自動判斷場景，套用最適合的風格</span>
+    </button>
+    <div class="cards">
+      <button class="card" type="button" data-go="collage"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 12h17M12 3.5v17"/></svg><span class="card-t">拼貼</span><span class="card-d">多選照片，自動挑好的排版</span></button>
+      <button class="card" type="button" data-go="reel"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10.5 9.5l4 2.5-4 2.5z"/></svg><span class="card-t">回顧影片</span><span class="card-d">照片配音樂，跟著節拍切換</span></button>
+      <button class="card" type="button" data-go="filter"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="5.5"/><circle cx="15" cy="9" r="5.5"/><circle cx="12" cy="15" r="5.5"/></svg><span class="card-t">濾鏡調色</span><span class="card-d">富士、柯達、G7X 等 19 款</span></button>
+      <button class="card" type="button" data-go="erase"><svg viewBox="0 0 24 24"><path d="M8.5 19.5h11M4.5 15.5l9-9a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8l-8 8H7.5l-3-3a.7.7 0 0 1 0-1z"/></svg><span class="card-t">AI 消除路人</span><span class="card-d">塗一下就消失，背景自動補上</span></button>
+      <button class="card" type="button" data-go="week"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg><span class="card-t">日曆回顧</span><span class="card-d">依拍攝日期排成一週回顧</span></button>
+      <button class="card" type="button" data-go="sticker"><svg viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M9 14c1.5 1.5 4.5 1.5 6 0"/></svg><span class="card-t">做貼紙</span><span class="card-d">把照片裡的人去背成貼紙</span></button>
+    </div>
+    <div class="cont" id="cont"></div>
+    <p class="note center">照片都在你的手機上處理，不會上傳</p>
+  </div>
+  <div class="mode" id="mode-edit">
+  <div class="thumbrow"><div class="thumbs" id="thumbs" aria-label="已選照片"></div><button class="tbtn" id="saveAll" type="button" hidden>全部儲存</button></div>
+
+  <div class="stage" id="stage">
+    <div class="fit"><canvas id="viewCanvas" aria-label="套用濾鏡後的預覽"></canvas><canvas id="paint" hidden aria-hidden="true"></canvas></div>
+    <span class="badge" id="badge"></span>
+    <button class="cmp" id="holdBtn" type="button">按住看原圖</button>
+    <p class="status" id="status" role="status"></p>
+  </div>
+
+  <div class="panel">
+    <section id="tab-tpl">
+      <div class="hscroll" id="tpls" role="group" aria-label="模板"></div>
+      <div class="field savetpl"><input id="tplName" type="text" maxlength="12" placeholder="幫目前的設定取個名字"><button class="tbtn" id="tplSave" type="button">存成模板</button></div>
+    </section>
+    <section id="tab-filter" hidden>
+      <div class="srow" id="strengthRow"></div>
+      <div class="hscroll pills" id="cats" role="group" aria-label="濾鏡分類"></div>
+      <div class="hscroll" id="filters"></div>
+    </section>
+    <section id="tab-adjust" hidden>
+      <div class="srow" id="adjustRow"></div>
+      <p class="note" id="adjustNote"></p>
+      <div class="hscroll" id="tools"></div>
+    </section>
+    <section id="tab-erase" hidden>
+      <div class="srow" id="brushRow"></div>
+      <div class="hscroll" id="eraseTools"></div>
+      <div class="pad"><button class="save wide" id="applyErase" type="button">消除塗紅的地方</button></div>
+    </section>
+    <section id="tab-frame" hidden>
+      <div class="hscroll" id="frames" role="group" aria-label="邊框"></div>
+      <label class="field" for="caption">相框文字 <input id="caption" type="text" maxlength="30" placeholder="寫在拍立得下方，可留空"></label>
+      <label class="field" for="stamp"><input id="stamp" type="checkbox"> 日期戳記 <input id="stampText" type="text" maxlength="20" aria-label="日期戳記內容"></label>
+    </section>
+  </div>
+
+  <nav class="tabbar five" id="tabbar" role="tablist">
+    <button type="button" role="tab" data-tab="tpl" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M10 4l1.6 4.4L16 10l-4.4 1.6L10 16l-1.6-4.4L4 10l4.4-1.6z"/><path d="M17.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>模板</button>
+    <button type="button" role="tab" data-tab="filter" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="5.5"/><circle cx="15" cy="9" r="5.5"/><circle cx="12" cy="15" r="5.5"/></svg>濾鏡</button>
+    <button type="button" role="tab" data-tab="adjust" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>調整</button>
+    <button type="button" role="tab" data-tab="erase" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M8.500 19.500h11M4.500 15.500l9-9a2 2 0 0 1 2.800 0l2.200 2.200a2 2 0 0 1 0 2.800l-8 8H7.500l-3-3a.7.7 0 0 1 0-1z"/><path d="M10.500 9.500l5 5"/></svg>消除</button>
+    <button type="button" role="tab" data-tab="frame" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1.5"/><rect x="7" y="6" width="10" height="9"/></svg>邊框日期</button>
+  </nav>
+  </div>
+
+  <div class="mode" id="mode-collage" hidden>
+    <div class="stage cstage">
+      <div class="fit" id="cFit"><canvas id="cCanvas" aria-label="拼貼預覽：拖移照片調整位置，雙指縮放，長按拖到另一格交換"></canvas></div>
+      <div class="ctx" id="cCtx" hidden></div>
+      <button class="help" id="cHelp" type="button" aria-label="拼貼操作說明">?</button>
+      <div class="coach" id="cCoach" hidden><div class="coach-card">
+        <p class="coach-t">拼貼這樣用</p>
+        <ol>
+          <li><b>點一格</b>，再從下方點照片放進去</li>
+          <li><b>拖曳</b>照片調整位置，<b>兩指</b>放大縮小</li>
+          <li><b>按住</b>照片不放，拖到另一格就能交換</li>
+          <li>貼紙用<b>右下角橘色圓鈕</b>旋轉、縮放</li>
+        </ol>
+        <button class="save" id="cCoachOk" type="button">知道了</button>
+      </div></div>
+      <div class="empty" id="cEmpty" hidden><p>一次多選一些照片，<br>我會挑出最好的幫你排版</p><button class="save" id="cEmptyBtn" type="button">從相簿選照片</button></div>
+      <p class="status" role="status"></p>
+    </div>
+    <div class="panel">
+      <section id="c-tpl"><div class="hscroll" id="cTpls"></div><p class="note" id="cRecNote"></p></section>
+      <section id="c-photo" hidden><p class="note" id="cPhotoNote"></p><div class="hscroll" id="cTray"></div><div class="pad btnrow"><button class="tbtn" id="cAuto" type="button">自動填滿空格</button><button class="tbtn" id="cClearCell" type="button">清空這格</button></div></section>
+      <section id="c-sticker" hidden><div class="pad pills subseg" role="group" aria-label="貼紙或文字"><button type="button" data-sub="sticker">貼紙</button><button type="button" data-sub="text">文字</button></div><p class="note">點一張照片，AI 自動去背做成貼紙</p><div class="hscroll" id="cCutTray"></div><div class="hscroll" id="cDecos"></div></section>
+      <section id="c-text" hidden><div class="pad pills subseg" role="group" aria-label="貼紙或文字"><button type="button" data-sub="sticker">貼紙</button><button type="button" data-sub="text">文字</button></div><div class="field"><input id="cText" type="text" maxlength="40" placeholder="輸入文字，例如地點或心情" aria-label="貼紙文字"><button class="tbtn" id="cTextAdd" type="button">加上文字</button></div><div class="hscroll pills" id="cTextStyles"></div><div class="hscroll swrow" id="cTextColors"></div></section>
+      <section id="c-style" hidden class="scrolly"><div class="hscroll pills" id="cRatios"></div><div class="pad pills" id="cStyKeys"><button type="button" data-k="gap">邊距</button><button type="button" data-k="radius">圓角</button></div><div class="srow" id="cStyleRow"></div><div class="hscroll swrow" id="cBgs"></div><div class="hscroll pills" id="cFilters"></div><label class="field" for="cHQ"><input id="cHQ" type="checkbox"> 高畫質輸出（2160 px）</label></section>
+    </div>
+    <nav class="tabbar four" id="cTabbar" role="tablist">
+      <button type="button" role="tab" data-tab="tpl" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/></svg>版型</button>
+      <button type="button" role="tab" data-tab="photo" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 18l5-5 3 3 2-2 4 4"/></svg>照片</button>
+      <button type="button" role="tab" data-tab="sticker" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z"/><path d="M15 4v4h4"/><path d="M9 14c1.5 1.5 4.5 1.5 6 0"/></svg>貼紙</button>
+      <button type="button" role="tab" data-tab="style" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="9" cy="9.5" r="1.3"/><circle cx="14.5" cy="8.5" r="1.3"/><circle cx="16" cy="13" r="1.3"/><path d="M11 17a2 2 0 0 1-2-2"/></svg>樣式</button>
+    </nav>
+  </div>
+
+  <div class="mode" id="mode-reel" hidden>
+    <div class="stage">
+      <div class="fit" id="rFit"><canvas id="rCanvas" aria-label="影片預覽"></canvas></div>
+      <div class="rctl"><button class="tbtn" id="rPlay" type="button">▶ 播放</button><span id="rTime"></span></div>
+      <p class="status" role="status"></p>
+    </div>
+    <div class="panel">
+      <section id="r-tpl"><div class="hscroll pills" id="rTpls"></div><p class="note" id="rTplNote"></p><p class="note">儲存時會即時錄製，錄完存成 MP4／WebM；錄製時請保持畫面開著。</p></section>
+      <section id="r-photos" hidden><p class="note" id="rPhotoNote"></p><div class="hscroll" id="rTray"></div><div class="pad btnrow"><button class="tbtn" id="rAuto" type="button">自動挑照片</button></div></section>
+      <section id="r-music" hidden><div class="field"><button class="tbtn" id="rMusicBtn" type="button">選擇音樂</button><span class="mname" id="rMusicName"></span><button class="tbtn" id="rMusicClear" type="button">移除</button></div><div class="srow" id="rBpmRow"></div><label class="field" for="rOffset">從第 <input id="rOffset" class="sec" type="number" inputmode="numeric" min="0" value="0"> 秒開始播</label></section>
+      <section id="r-text" hidden><label class="field" for="rTitle">標題 <input id="rTitle" type="text" maxlength="30" placeholder="開場大標題，用 / 換行"></label><label class="field" for="rSub">副標 <input id="rSub" type="text" maxlength="30" placeholder="地點或一句話"></label><div class="hscroll pills" id="rFilters"></div></section>
+    </div>
+    <nav class="tabbar four" id="rTabbar" role="tablist">
+      <button type="button" role="tab" data-tab="tpl" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>模板</button>
+      <button type="button" role="tab" data-tab="photos" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 18l5-5 3 3 2-2 4 4"/></svg>照片</button>
+      <button type="button" role="tab" data-tab="music" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>音樂</button>
+      <button type="button" role="tab" data-tab="text" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13M9 19h6"/></svg>文字</button>
+    </nav>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <img id="overlayImg" alt="完成的照片">
+  <video id="overlayVid" controls playsinline hidden></video>
+  <p id="overlayMsg">長按圖片即可儲存到相簿</p>
+  <button class="save" id="overlayShare" type="button" hidden>存到相簿</button>
+  <button class="tbtn" id="overlayClose" type="button">關閉</button>
+</div>
+
+<script>
