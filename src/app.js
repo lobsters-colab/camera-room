@@ -187,7 +187,7 @@ async function selectPhoto(i) {
   if (!next) return;
   if (!next.prev || !next.prev.width) say("讀取照片中…", true);
   try { await ensureLoaded(next); } catch (e) { say("這張照片讀不出來"); return; }
-  if (token !== selectToken) return;
+  if (token !== selectToken) { if (next !== curPhoto()) unloadPhoto(next); return; }
   state.cur = i;
   if (old && old !== next) unloadPhoto(old);
   say("");
@@ -464,6 +464,7 @@ $("saveOne").onclick = async () => {
   if (state.mode === "collage") return exportCollage();
   if (state.mode === "reel") return exportReel();
   const photo = state.photos[state.cur];
+  if (!photo || photo.sample) { say("先按右上角「＋ 照片」選一張照片"); return; }
   busy(true, "正在用原始解析度處理…"); await tick();
   try {
     const file = await exportPhoto(photo);
@@ -602,7 +603,7 @@ async function aiFind() {
   const photo = curPhoto();
   let r = null;
   if (localAI) {
-    busy(true, detector ? "AI 正在找路人…" : "AI 準備中，第一次要下載模型…"); await tick();
+    busy(true, sessions.detect ? "AI 正在找路人…" : "AI 準備中，第一次要下載模型…"); await tick();
     try { r = await findPassersby(photo); } catch (e) { localAI = false; }
   }
   if (!r) {

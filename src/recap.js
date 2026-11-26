@@ -66,7 +66,7 @@ function analyze(c) {
 const ham = (a, b) => { let s = 0; for (let i = 0; i < 64; i++) s += a[i] !== b[i]; return s; };
 async function importToLib(files) {
   const added = [];
-  let n = 0;
+  let n = 0, bad = 0;
   for (const f of files) {
     n++; say(`匯入照片 ${n} / ${files.length}…`, true);
     try {
@@ -78,10 +78,10 @@ async function importToLib(files) {
       const it = { id: uid(), file: f, name: f.name, date: date || (f.lastModified ? new Date(f.lastModified) : null), exif: !!date, w, h, small, thumb: coverThumb(small, 140) };
       it.stats = analyze(small);
       R.lib.push(it); added.push(it);
-    } catch (e) {}
+    } catch (e) { bad++; }
     if (n % 3 === 0) await tick();
   }
-  say(added.length ? `已匯入 ${added.length} 張` : "照片無法讀取，請換成 JPG 或 PNG");
+  say(added.length ? `已匯入 ${added.length} 張` + (bad ? `，${bad} 個檔案讀不出來` : "") : "照片無法讀取，請換成 JPG 或 PNG");
   return added;
 }
 
@@ -750,11 +750,14 @@ function placePhoto(pid) {
   cDirty(); renderCTab();
 }
 function autoFill() {
-  const used = new Set(R.proj.cells.map(c => c.pid).filter(Boolean)), pool = dedupe(R.lib).filter(x => !used.has(x.id));
+  const used = new Set(R.proj.cells.map(c => c.pid).filter(Boolean)), best = dedupe(R.lib);
+  // best distinct photos first, then any other unused ones so no cell stays empty
+  const pool = best.concat(R.lib.filter(x => !best.includes(x))).filter(x => !used.has(x.id));
   for (const c of R.proj.cells) if (!c.pid && pool.length) { c.pid = pool.shift().id; c.cx = c.cy = .5; c.z = 1; }
   cDirty(); renderCTab();
 }
 async function exportCollage() {
+  if (!R.proj || !R.proj.cells.some(c => c.pid)) { say("先放幾張照片進拼貼再儲存"); return; }
   const ratio = RATIOS[R.proj.ratio] || 1.25, W = $("cHQ").checked ? 2160 : 1080, H = Math.round(W * ratio);
   busy(true, "正在用原始畫質輸出…"); await tick();
   try {
